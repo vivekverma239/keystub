@@ -574,6 +574,57 @@
       }
     },
     {
+      "id": "zai",
+      "name": "Z.AI",
+      "category": "llm",
+      "docs": "https://docs.z.ai/api-reference/introduction",
+      "note": "General keys use /api/paas/v4; GLM Coding Plan keys use /api/coding/paas/v4, or /api/anthropic for Anthropic-style clients, which need ANTHROPIC_AUTH_TOKEN, not ANTHROPIC_API_KEY (x-api-key).",
+      "hosts": [
+        "api.z.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "ZAI_API_KEY"
+      ],
+      "usage": {
+        "operations": [
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/api/paas/v4/chat/completions"
+          },
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/api/coding/paas/v4/chat/completions"
+          },
+          {
+            "name": "messages",
+            "method": "POST",
+            "path": "/api/anthropic/v1/messages"
+          }
+        ],
+        "model": "model|response.model|message.model|request:model",
+        "input": [
+          "usage.prompt_tokens|usage.input_tokens|message.usage.input_tokens",
+          "usage.cache_read_input_tokens|message.usage.cache_read_input_tokens",
+          "usage.cache_creation_input_tokens|message.usage.cache_creation_input_tokens"
+        ],
+        "cached": [
+          "usage.prompt_tokens_details.cached_tokens|usage.cache_read_input_tokens|message.usage.cache_read_input_tokens"
+        ],
+        "cacheWrite": [
+          "usage.cache_creation_input_tokens|message.usage.cache_creation_input_tokens"
+        ],
+        "output": [
+          "usage.completion_tokens|usage.output_tokens|message.usage.output_tokens"
+        ]
+      }
+    },
+    {
       "id": "xai",
       "name": "xAI",
       "category": "llm",
@@ -866,6 +917,22 @@
       }
     },
     {
+      "id": "linkup",
+      "name": "Linkup",
+      "category": "search",
+      "docs": "https://docs.linkup.so/pages/documentation/development/authentication",
+      "hosts": [
+        "api.linkup.so"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "LINKUP_API_KEY"
+      ]
+    },
+    {
       "id": "replicate",
       "name": "Replicate",
       "category": "llm",
@@ -938,6 +1005,23 @@
       },
       "envVars": [
         "SUPABASE_ACCESS_TOKEN"
+      ]
+    },
+    {
+      "id": "upstash-box",
+      "name": "Upstash Box",
+      "category": "infrastructure",
+      "docs": "https://upstash.com/docs/box",
+      "note": "The key goes in X-Box-Api-Key, as @upstash/box sends it. Only the default region host is listed.",
+      "hosts": [
+        "us-east-1.box.upstash.com"
+      ],
+      "auth": {
+        "header": "X-Box-Api-Key",
+        "format": "{key}"
+      },
+      "envVars": [
+        "UPSTASH_BOX_API_KEY"
       ]
     },
     {

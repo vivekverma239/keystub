@@ -718,6 +718,62 @@
       }
     },
     {
+      "name": "z.ai chat completion",
+      "service": "zai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/api/paas/v4/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id\":\"x\",\"model\":\"glm-4.6\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Hi\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":120,\"completion_tokens\":30,\"total_tokens\":150,\"prompt_tokens_details\":{\"cached_tokens\":40}}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "glm-4.6",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 120,
+          "cachedTokens": 40,
+          "cacheWriteTokens": 0,
+          "outputTokens": 30,
+          "units": 0
+        }
+      }
+    },
+    {
+      "name": "z.ai coding plan anthropic messages",
+      "service": "zai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/api/anthropic/v1/messages"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"glm-4.6\",\"content\":[{\"type\":\"text\",\"text\":\"Hi\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":100,\"cache_read_input_tokens\":500,\"output_tokens\":20}}"
+      },
+      "expect": {
+        "operation": "messages",
+        "model": "glm-4.6",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 600,
+          "cachedTokens": 500,
+          "cacheWriteTokens": 0,
+          "outputTokens": 20,
+          "units": 0
+        }
+      }
+    },
+    {
       "name": "deepseek off-peak half price",
       "service": "deepseek",
       "time": "2026-10-17T02:00:00Z",
