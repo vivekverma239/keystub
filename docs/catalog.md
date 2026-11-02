@@ -44,7 +44,6 @@ Services whose auth doesn't fit one key in one header:
 
 | Service | Why |
 | --- | --- |
-| Fly.io | Newer tokens use the `FlyV1` scheme and older ones `Bearer`, chosen by the token's prefix |
 | Datadog | Most calls need two secrets, an API key and an application key, in two headers |
 | Railway project tokens, Postmark account tokens, GitLab CI job tokens | A second token type in its own header; the catalog entry covers the main token type |
 

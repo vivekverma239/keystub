@@ -933,6 +933,22 @@
       ]
     },
     {
+      "id": "exa",
+      "name": "Exa",
+      "category": "search",
+      "docs": "https://docs.exa.ai/reference/getting-started",
+      "hosts": [
+        "api.exa.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "EXA_API_KEY"
+      ]
+    },
+    {
       "id": "replicate",
       "name": "Replicate",
       "category": "llm",
@@ -1077,6 +1093,24 @@
       },
       "envVars": [
         "RAILWAY_API_TOKEN"
+      ]
+    },
+    {
+      "id": "fly",
+      "name": "Fly.io",
+      "category": "infrastructure",
+      "docs": "https://fly.io/auth.md",
+      "note": "Save the whole token as fly tokens create prints it, FlyV1 prefix included: Fly takes it as a bearer token, prefix and all. Covers the Machines API and the GraphQL API; fly deploy also pushes images to registry.fly.io, which isn't covered.",
+      "hosts": [
+        "api.machines.dev",
+        "api.fly.io"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "FLY_API_TOKEN"
       ]
     },
     {
