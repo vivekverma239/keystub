@@ -16,9 +16,9 @@ What this page adds to, or changes in, the contract as first agreed, newest firs
 3. **`POST /api/tokens/ensure`** hands out an existing token's value only if `ensure` made it: those tokens carry principal `keystub-run`. Any other live token of that name gets 409. Tokens converted from before saved keys with no services and no principal are marked `keystub-run`, so worktrees keep theirs; the conversion notices list the live ones marked.
 4. **Conversion:** a token limited to two or more services is revoked rather than widened, and named in the conversion notices (`notices` in `GET /api/me`, the dashboard, `keystub whoami`). One service makes a service token; none makes an environment token.
 5. **Key limits** are counted only while set. With none, a key shows no count. The other levels are always counted on self-hosted; hosted counts only levels with a limit (see [limits](../docs/limits.md)).
-6. **`PATCH /api/environments/{env}`** needs `limits`: an object sets them, `null` clears them, and leaving it out is a 400.
+6. **`PATCH /api/environments/{env}`** and **`PATCH /api/projects/{id}`** need `limits`: an object sets them, `null` clears them, and leaving it out is a 400. On hosted they need a signed-in user: an API key gets 403.
 7. **The 429 for a saved key's limit** names the service, not the key: `daily limit reached for the saved key for openai`.
-8. **Errors** also include 403 (a signed-in page's cross-site request), 405 (a known route, another method), 413 (a body over 256 KiB) and, on the data plane, 502 (no saved key linked).
+8. **Errors** also include 403 (a signed-in page's cross-site request, or on hosted an API key changing project or environment limits), 405 (a known route, another method), 413 (a body over 256 KiB) and, on the data plane, 502 (no saved key linked).
 9. **Token names**, from any route, can be at most 128 characters, with no control characters.
 10. **Interpretations** of the brief, kept as first written: `Link.version` is the link's own; usage `key` is the saved key's ID, last in the CSV; `Token` also has `principal` and `state`; `{env}` is sent with a literal slash; a new link's token is named after its service (`-2`, `-3`… if taken); setup lines use `<token>`.
 
@@ -33,7 +33,7 @@ What this page adds to, or changes in, the contract as first agreed, newest firs
 - **Errors:** `{"error": {"type": "keystub", "message": "…"}}`, plus fields named below for particular errors.
   - 400: a bad request.
   - 401: missing or wrong auth.
-  - 403: a request from a signed-in dashboard page sent from another site.
+  - 403: a request from a signed-in dashboard page sent from another site, or on hosted an API key doing what only a signed-in user may (project and environment limits).
   - 404: something missing, or a route that doesn't exist.
   - 405: a route that exists, called with another method.
   - 409: a clash with what exists.
@@ -189,7 +189,7 @@ POST   /api/tokens/ensure              {"env", "name"} -> 200 {"id", "name", "en
 
 - **`/api/me` without a key** answers 401 in the error shape above. The CLI checks this before sending the admin key to the server `serve.json` names, since that file outlives the server.
 - **`notices`:** what converting older data changed, such as tokens it revoked. The dashboard and `keystub whoami` show them too.
-- **Project and environment limits:** `PATCH` needs `limits`. An object sets them, `null` clears them, and leaving it out is a 400. An object replaces both levels; the CLI's `projects limits` and `envs limits` keep a level you don't name by reading it first. On hosted, these need a signed-in user: an API key gets 403.
+- **Project and environment limits:** `PATCH` needs `limits`. An object sets them, `null` clears them, and leaving it out is a 400. An object replaces both levels; the CLI's `projects limits` and `envs limits` keep a level you don't name by reading it first, so two changes at once can overwrite each other. On hosted, these need a signed-in user: an API key gets 403.
 - **Deleting an environment:** revokes its tokens, removes its links, and takes it off every linked machine. The saved keys stay. On hosted, a `remaining` above 0 means the edge hasn't heard all of it yet: `POST /api/environments/{env}/resync` until it is 0.
 - **Services:**
   - A service's hosts and header decide where its saved keys are sent, so they never change by accident.

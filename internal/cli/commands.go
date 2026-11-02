@@ -339,7 +339,7 @@ func (c *ctx) keys(args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := p.want(1, 1, "keys limits KEY [--daily N] [--per-minute N] [--clear]"); err != nil {
+		if err := p.want(1, 1, "keys limits KEY [--daily N] [--per-minute N] [--clear] [--service S]"); err != nil {
 			return err
 		}
 		l, err := limitsChange(p)
@@ -708,13 +708,13 @@ func (c *ctx) projects(args []string) error {
 			return err
 		}
 		var pr *project
-		for i := range out.Projects {
-			if out.Projects[i].ID == p.args[0] {
+		for i, x := range out.Projects {
+			if x.ID == p.args[0] || (pr == nil && strings.EqualFold(x.Name, p.args[0])) {
 				pr = &out.Projects[i]
 			}
 		}
 		if pr == nil {
-			return &Error{Code: ExitNotFound, Message: fmt.Sprintf("no project %q", p.args[0])}
+			return &Error{Code: ExitNotFound, Message: fmt.Sprintf("no project with ID or name %q (keystub projects list shows them)", p.args[0])}
 		}
 		l = keepUnset(l, pr.Limits, p)
 		if err := c.call("PATCH", "/api/projects/"+url.PathEscape(pr.ID), map[string]any{"limits": l}, nil); err != nil {

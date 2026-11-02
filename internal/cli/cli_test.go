@@ -768,3 +768,51 @@ func TestProjectAndEnvironmentLimits(t *testing.T) {
 		}
 	}
 }
+
+func TestLimitsKeepLevelsNotNamed(t *testing.T) {
+	// A level the command doesn't name keeps its value, including when the
+	// server sends no limits at all (null, as hosted does).
+	p := parsed{flags: map[string]string{"daily": "0"}, set: map[string]bool{"daily": true}}
+	if got := keepUnset(&limits{}, &limits{DailyRequests: 9, PerMinute: 5}, p); *got != (limits{0, 5}) {
+		t.Fatalf("--daily 0 = %+v", got)
+	}
+	if got := keepUnset(&limits{DailyRequests: 3}, nil, p); *got != (limits{3, 0}) {
+		t.Fatalf("no current limits = %+v", got)
+	}
+	if got := keepUnset(nil, &limits{DailyRequests: 9}, p); got != nil {
+		t.Fatalf("--clear = %+v", got)
+	}
+
+	r := newRig(t)
+	r.must("", "services", "add", "echo", "--hosts", "api.echo.test")
+	r.must("real-one", "keys", "add", "echo", "--name", "team", "--daily", "50", "--per-minute", "5")
+	r.must("", "keys", "limits", "team", "--daily", "0")
+	k := r.must("", "keys", "show", "team", "--json").json(t)["key"].(map[string]any)["limits"].(map[string]any)
+	if k["dailyRequests"].(float64) != 0 || k["perMinute"].(float64) != 5 {
+		t.Fatalf("after --daily 0: %v", k)
+	}
+	r.must("", "keys", "limits", "team", "--clear")
+	if k := r.must("", "keys", "show", "team", "--json").json(t)["key"].(map[string]any)["limits"]; k != nil {
+		if m := k.(map[string]any); m["dailyRequests"].(float64) != 0 || m["perMinute"].(float64) != 0 {
+			t.Fatalf("after --clear: %v", k)
+		}
+	}
+
+	// Projects by ID or name; list JSON shape; text output.
+	r.must("", "envs", "add", "shop/ci")
+	r.must("", "projects", "limits", "SHOP", "--daily", "7")
+	ps := r.must("", "projects", "list", "--json").json(t)["projects"].([]any)
+	found := false
+	for _, x := range ps {
+		m := x.(map[string]any)
+		if m["id"] == "shop" {
+			found = m["limits"].(map[string]any)["dailyRequests"].(float64) == 7
+		}
+	}
+	if !found {
+		t.Fatalf("projects list = %v", ps)
+	}
+	if out := r.must("", "envs", "limits", "shop/ci", "--per-minute", "3").stdout; out != "Limits for shop/ci: 3/min.\n" {
+		t.Fatalf("envs limits printed %q", out)
+	}
+}

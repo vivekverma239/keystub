@@ -177,10 +177,14 @@ A proxy token works only on its way through Keystub. Pick one:
   `keystub keys limits team --service openai --daily 1000 --per-minute 60 --json`;
   tokens take them when made:
   `keystub tokens create my-app/ci --name ci --daily 500 --write-env .env.ci --json`.
+  On hosted, project and environment limits need `keystub login`: with
+  `KEYSTUB_API_KEY` they get 403 (exit 1), so ask the user to sign in or set
+  them on the dashboard.
 - **Usage:** `keystub usage my-app/dev --by service,key --range 7d --json`
   (`--by` also takes `token`, `model`, `operation`, `env` and `project`;
   `--range` takes `24h`, `7d` or `30d`).
-- **See what exists:** `keystub keys list --json`, `keystub envs list --json`,
+- **See what exists:** `keystub keys list --json`, `keystub projects list --json`,
+  `keystub envs list --json`,
   `keystub keys show team --service openai --json`.
 - **Delete** (ask first): `keystub keys delete team --service openai --yes --json`
   fails with exit code 5 while the key is linked; unlink it first.

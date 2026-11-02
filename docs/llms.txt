@@ -73,4 +73,6 @@ Later:
     keystub keys limits team --service openai --daily 5000
     keystub projects list            (envs list and keys list show limits too)
   A token's limits are set when it's made: tokens create … --daily N --per-minute N
+  On hosted, project and environment limits need a signed-in user (login, not an
+  API key, which gets 403).
 - The CA for the remote proxy:          keystub ca -o keystub-ca.pem
