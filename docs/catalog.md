@@ -45,6 +45,9 @@ Services whose auth doesn't fit one key in one header:
 | Service | Why |
 | --- | --- |
 | Datadog | Most calls need two secrets, an API key and an application key, in two headers |
+| Langfuse, Modal | Two secrets per request (Langfuse as Basic auth, public and secret key) |
+| NCBI E-utilities, Trello, LocationIQ | The key goes in the query string |
+| MailerLite classic API | Its own header on another host; the catalog's MailerLite entry covers the new API |
 | Railway project tokens, Postmark account tokens, GitLab CI job tokens | A second token type in its own header; the catalog entry covers the main token type |
 
 ## Usage metadata
