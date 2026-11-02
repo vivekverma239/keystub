@@ -1,0 +1,1235 @@
+{
+  "version": 1,
+  "services": [
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "category": "llm",
+      "docs": "https://platform.openai.com/docs/api-reference",
+      "hosts": [
+        "api.openai.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "OPENAI_BASE_URL",
+        "path": "/v1"
+      },
+      "envVars": [
+        "OPENAI_API_KEY"
+      ],
+      "statusPage": "https://status.openai.com",
+      "usage": {
+        "operations": [
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/v1/chat/completions"
+          },
+          {
+            "name": "responses",
+            "method": "POST",
+            "path": "/v1/responses"
+          },
+          {
+            "name": "compact",
+            "method": "POST",
+            "path": "/v1/responses/compact"
+          },
+          {
+            "name": "embeddings",
+            "method": "POST",
+            "path": "/v1/embeddings"
+          },
+          {
+            "name": "completions",
+            "method": "POST",
+            "path": "/v1/completions"
+          }
+        ],
+        "model": "model|response.model|request:model",
+        "input": [
+          "usage.prompt_tokens|usage.input_tokens|response.usage.input_tokens"
+        ],
+        "cached": [
+          "usage.prompt_tokens_details.cached_tokens|usage.input_tokens_details.cached_tokens|response.usage.input_tokens_details.cached_tokens"
+        ],
+        "cacheWrite": [
+          "usage.prompt_tokens_details.cache_write_tokens|usage.input_tokens_details.cache_write_tokens|response.usage.input_tokens_details.cache_write_tokens"
+        ],
+        "output": [
+          "usage.completion_tokens|usage.output_tokens|response.usage.output_tokens"
+        ],
+        "quota": {
+          "requests": "x-ratelimit-remaining-requests",
+          "tokens": "x-ratelimit-remaining-tokens"
+        }
+      }
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "category": "llm",
+      "docs": "https://docs.anthropic.com/en/api",
+      "hosts": [
+        "api.anthropic.com"
+      ],
+      "auth": {
+        "header": "x-api-key",
+        "format": "{key}"
+      },
+      "baseUrl": {
+        "var": "ANTHROPIC_BASE_URL"
+      },
+      "envVars": [
+        "ANTHROPIC_API_KEY"
+      ],
+      "statusPage": "https://status.claude.com",
+      "usage": {
+        "operations": [
+          {
+            "name": "messages",
+            "method": "POST",
+            "path": "/v1/messages"
+          },
+          {
+            "name": "count_tokens",
+            "method": "POST",
+            "path": "/v1/messages/count_tokens"
+          },
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/v1/chat/completions"
+          }
+        ],
+        "model": "model|message.model|request:model",
+        "input": [
+          "usage.input_tokens|message.usage.input_tokens|usage.prompt_tokens",
+          "usage.cache_read_input_tokens|message.usage.cache_read_input_tokens",
+          "usage.cache_creation_input_tokens|message.usage.cache_creation_input_tokens"
+        ],
+        "cached": [
+          "usage.cache_read_input_tokens|message.usage.cache_read_input_tokens"
+        ],
+        "cacheWrite": [
+          "usage.cache_creation_input_tokens|message.usage.cache_creation_input_tokens"
+        ],
+        "output": [
+          "usage.output_tokens|message.usage.output_tokens|usage.completion_tokens"
+        ],
+        "quota": {
+          "requests": "anthropic-ratelimit-requests-remaining",
+          "tokens": "anthropic-ratelimit-tokens-remaining"
+        }
+      }
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "category": "code",
+      "docs": "https://docs.github.com/en/rest",
+      "hosts": [
+        "api.github.com",
+        "uploads.github.com",
+        "github.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "GH_TOKEN",
+        "GITHUB_TOKEN"
+      ]
+    },
+    {
+      "id": "stripe",
+      "name": "Stripe",
+      "category": "payments",
+      "docs": "https://docs.stripe.com/api",
+      "hosts": [
+        "api.stripe.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "STRIPE_API_KEY"
+      ]
+    },
+    {
+      "id": "resend",
+      "name": "Resend",
+      "category": "email",
+      "docs": "https://resend.com/docs/api-reference",
+      "hosts": [
+        "api.resend.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "RESEND_API_KEY"
+      ]
+    },
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare",
+      "category": "infrastructure",
+      "docs": "https://developers.cloudflare.com/api/",
+      "note": "API tokens only; the legacy global key (X-Auth-Key plus email) isn't supported.",
+      "hosts": [
+        "api.cloudflare.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "CLOUDFLARE_API_TOKEN"
+      ]
+    },
+    {
+      "id": "vercel",
+      "name": "Vercel",
+      "category": "infrastructure",
+      "docs": "https://vercel.com/docs/rest-api",
+      "note": "The Vercel CLI rejects \"-\" in tokens, so it gets the compact form.",
+      "hosts": [
+        "api.vercel.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "VERCEL_TOKEN={key_compact}"
+      ]
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "category": "llm",
+      "docs": "https://ai.google.dev/api",
+      "note": "The OpenAI-compatible endpoints take the key in Authorization: Bearer, which also works.",
+      "hosts": [
+        "generativelanguage.googleapis.com"
+      ],
+      "auth": {
+        "header": "x-goog-api-key",
+        "format": "{key}"
+      },
+      "baseUrl": {
+        "var": "GOOGLE_GEMINI_BASE_URL"
+      },
+      "envVars": [
+        "GOOGLE_API_KEY",
+        "GEMINI_API_KEY"
+      ],
+      "statusPage": "https://aistudio.google.com/status",
+      "usage": {
+        "operations": [
+          {
+            "name": "generate",
+            "method": "POST",
+            "path": "/*/models/{model}:generateContent"
+          },
+          {
+            "name": "stream",
+            "method": "POST",
+            "path": "/*/models/{model}:streamGenerateContent"
+          },
+          {
+            "name": "embed",
+            "method": "POST",
+            "path": "/*/models/{model}:embedContent"
+          },
+          {
+            "name": "batch_embed",
+            "method": "POST",
+            "path": "/*/models/{model}:batchEmbedContents"
+          },
+          {
+            "name": "count_tokens",
+            "method": "POST",
+            "path": "/*/models/{model}:countTokens"
+          },
+          {
+            "name": "interactions",
+            "method": "POST",
+            "path": "/v1beta/interactions"
+          },
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/v1beta/openai/chat/completions"
+          },
+          {
+            "name": "embeddings",
+            "method": "POST",
+            "path": "/v1beta/openai/embeddings"
+          }
+        ],
+        "model": "modelVersion|model|path:model|request:model",
+        "input": [
+          "usageMetadata.promptTokenCount|usage.prompt_tokens"
+        ],
+        "cached": [
+          "usageMetadata.cachedContentTokenCount"
+        ],
+        "output": [
+          "usageMetadata.candidatesTokenCount|usage.completion_tokens",
+          "usageMetadata.thoughtsTokenCount"
+        ]
+      }
+    },
+    {
+      "id": "mistral",
+      "name": "Mistral",
+      "category": "llm",
+      "docs": "https://docs.mistral.ai/api/",
+      "hosts": [
+        "api.mistral.ai",
+        "api.eu.mistral.ai",
+        "api.us.mistral.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "MISTRAL_API_KEY"
+      ],
+      "statusPage": "https://status.mistral.ai",
+      "usage": {
+        "operations": [
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/v1/chat/completions"
+          },
+          {
+            "name": "fim",
+            "method": "POST",
+            "path": "/v1/fim/completions"
+          },
+          {
+            "name": "embeddings",
+            "method": "POST",
+            "path": "/v1/embeddings"
+          }
+        ],
+        "model": "model|response.model|request:model",
+        "input": [
+          "usage.prompt_tokens"
+        ],
+        "cached": [
+          "usage.prompt_tokens_details.cached_tokens"
+        ],
+        "output": [
+          "usage.completion_tokens"
+        ]
+      }
+    },
+    {
+      "id": "groq",
+      "name": "Groq",
+      "category": "llm",
+      "docs": "https://console.groq.com/docs/api-reference",
+      "hosts": [
+        "api.groq.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "GROQ_BASE_URL"
+      },
+      "envVars": [
+        "GROQ_API_KEY"
+      ],
+      "statusPage": "https://groqstatus.com",
+      "usage": {
+        "operations": [
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/openai/v1/chat/completions"
+          },
+          {
+            "name": "responses",
+            "method": "POST",
+            "path": "/openai/v1/responses"
+          },
+          {
+            "name": "transcriptions",
+            "method": "POST",
+            "path": "/openai/v1/audio/transcriptions"
+          },
+          {
+            "name": "translations",
+            "method": "POST",
+            "path": "/openai/v1/audio/translations"
+          },
+          {
+            "name": "speech",
+            "method": "POST",
+            "path": "/openai/v1/audio/speech"
+          }
+        ],
+        "model": "model|response.model|request:model",
+        "input": [
+          "usage.prompt_tokens|x_groq.usage.prompt_tokens|usage.input_tokens|response.usage.input_tokens"
+        ],
+        "cached": [
+          "usage.prompt_tokens_details.cached_tokens|x_groq.usage.prompt_tokens_details.cached_tokens"
+        ],
+        "output": [
+          "usage.completion_tokens|x_groq.usage.completion_tokens|usage.output_tokens|response.usage.output_tokens"
+        ],
+        "status": {
+          "498": "upstream_error"
+        },
+        "quota": {
+          "requests": "x-ratelimit-remaining-requests",
+          "tokens": "x-ratelimit-remaining-tokens"
+        }
+      }
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "category": "llm",
+      "docs": "https://openrouter.ai/docs/api-reference/authentication",
+      "hosts": [
+        "openrouter.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "OPENROUTER_BASE_URL",
+        "path": "/api/v1"
+      },
+      "envVars": [
+        "OPENROUTER_API_KEY"
+      ],
+      "usage": {
+        "operations": [
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/api/v1/chat/completions"
+          },
+          {
+            "name": "responses",
+            "method": "POST",
+            "path": "/api/v1/responses"
+          },
+          {
+            "name": "completions",
+            "method": "POST",
+            "path": "/api/v1/completions"
+          },
+          {
+            "name": "embeddings",
+            "method": "POST",
+            "path": "/api/v1/embeddings"
+          },
+          {
+            "name": "messages",
+            "method": "POST",
+            "path": "/api/v1/messages"
+          }
+        ],
+        "model": "model|response.model|request:model",
+        "input": [
+          "usage.prompt_tokens|usage.input_tokens|response.usage.input_tokens"
+        ],
+        "cached": [
+          "usage.prompt_tokens_details.cached_tokens"
+        ],
+        "cacheWrite": [
+          "usage.prompt_tokens_details.cache_write_tokens"
+        ],
+        "output": [
+          "usage.completion_tokens|usage.output_tokens|response.usage.output_tokens"
+        ],
+        "cost": "usage.cost|response.usage.cost"
+      }
+    },
+    {
+      "id": "vercel-ai-gateway",
+      "name": "Vercel AI Gateway",
+      "category": "llm",
+      "docs": "https://vercel.com/docs/ai-gateway/authentication-and-byok",
+      "note": "The token goes in Authorization as a bearer token, as the OpenAI SDK and the AI SDK send it; the Anthropic SDK and Claude Code need ANTHROPIC_AUTH_TOKEN, not ANTHROPIC_API_KEY (x-api-key).",
+      "hosts": [
+        "ai-gateway.vercel.sh"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "AI_GATEWAY_API_KEY"
+      ],
+      "usage": {
+        "operations": [
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/v1/chat/completions"
+          },
+          {
+            "name": "responses",
+            "method": "POST",
+            "path": "/v1/responses"
+          },
+          {
+            "name": "embeddings",
+            "method": "POST",
+            "path": "/v1/embeddings"
+          },
+          {
+            "name": "messages",
+            "method": "POST",
+            "path": "/v1/messages"
+          },
+          {
+            "name": "count_tokens",
+            "method": "POST",
+            "path": "/v1/messages/count_tokens"
+          }
+        ],
+        "model": "model|response.model|message.model|request:model",
+        "input": [
+          "usage.prompt_tokens|usage.input_tokens|response.usage.input_tokens|message.usage.input_tokens",
+          "usage.cache_read_input_tokens|message.usage.cache_read_input_tokens",
+          "usage.cache_creation_input_tokens|message.usage.cache_creation_input_tokens"
+        ],
+        "cached": [
+          "usage.prompt_tokens_details.cached_tokens|usage.input_tokens_details.cached_tokens|response.usage.input_tokens_details.cached_tokens|usage.cache_read_input_tokens|message.usage.cache_read_input_tokens"
+        ],
+        "cacheWrite": [
+          "usage.cache_creation_input_tokens|message.usage.cache_creation_input_tokens"
+        ],
+        "output": [
+          "usage.completion_tokens|usage.output_tokens|response.usage.output_tokens|message.usage.output_tokens"
+        ],
+        "cost": "usage.cost|response.usage.cost"
+      }
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "category": "llm",
+      "docs": "https://api-docs.deepseek.com/",
+      "hosts": [
+        "api.deepseek.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "DEEPSEEK_API_KEY"
+      ],
+      "statusPage": "https://status.deepseek.com",
+      "usage": {
+        "operations": [
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/chat/completions"
+          },
+          {
+            "name": "responses",
+            "method": "POST",
+            "path": "/responses"
+          },
+          {
+            "name": "fim",
+            "method": "POST",
+            "path": "/beta/completions"
+          }
+        ],
+        "model": "model|response.model|request:model",
+        "input": [
+          "usage.prompt_tokens"
+        ],
+        "cached": [
+          "usage.prompt_cache_hit_tokens|usage.prompt_tokens_details.cached_tokens"
+        ],
+        "output": [
+          "usage.completion_tokens"
+        ]
+      }
+    },
+    {
+      "id": "xai",
+      "name": "xAI",
+      "category": "llm",
+      "docs": "https://docs.x.ai/docs/api-reference",
+      "note": "REST API. The official Python SDK uses gRPC, which needs the proxy, not quick start.",
+      "hosts": [
+        "api.x.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "XAI_API_KEY"
+      ],
+      "statusPage": "https://status.x.ai",
+      "usage": {
+        "operations": [
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/v1/chat/completions"
+          },
+          {
+            "name": "responses",
+            "method": "POST",
+            "path": "/v1/responses"
+          },
+          {
+            "name": "completions",
+            "method": "POST",
+            "path": "/v1/completions"
+          },
+          {
+            "name": "messages",
+            "method": "POST",
+            "path": "/v1/messages"
+          }
+        ],
+        "model": "model|response.model|request:model",
+        "input": [
+          "usage.prompt_tokens|usage.input_tokens|response.usage.input_tokens"
+        ],
+        "cached": [
+          "usage.prompt_tokens_details.cached_tokens|usage.input_tokens_details.cached_tokens|response.usage.input_tokens_details.cached_tokens"
+        ],
+        "output": [
+          "usage.completion_tokens|usage.output_tokens|response.usage.output_tokens",
+          "usage.completion_tokens_details.reasoning_tokens|usage.output_tokens_details.reasoning_tokens|response.usage.output_tokens_details.reasoning_tokens"
+        ],
+        "cost": "usage.cost_in_usd_ticks|response.usage.cost_in_usd_ticks",
+        "costPerUsd": 10000000000
+      }
+    },
+    {
+      "id": "together",
+      "name": "Together AI",
+      "category": "llm",
+      "docs": "https://docs.together.ai/reference/chat-completions-1",
+      "hosts": [
+        "api.together.ai",
+        "api.together.xyz",
+        "api-inference.together.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "TOGETHER_API_KEY"
+      ],
+      "note": "SDK 1.x calls api.together.xyz; 3.x calls api.together.ai.",
+      "statusPage": "https://status.together.ai",
+      "usage": {
+        "operations": [
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/v1/chat/completions"
+          },
+          {
+            "name": "completions",
+            "method": "POST",
+            "path": "/v1/completions"
+          },
+          {
+            "name": "embeddings",
+            "method": "POST",
+            "path": "/v1/embeddings"
+          },
+          {
+            "name": "images",
+            "method": "POST",
+            "path": "/v1/images/generations"
+          }
+        ],
+        "model": "model|response.model|request:model",
+        "input": [
+          "usage.prompt_tokens"
+        ],
+        "cached": [
+          "usage.prompt_tokens_details.cached_tokens|usage.cached_tokens"
+        ],
+        "output": [
+          "usage.completion_tokens"
+        ]
+      }
+    },
+    {
+      "id": "fireworks",
+      "name": "Fireworks AI",
+      "category": "llm",
+      "docs": "https://docs.fireworks.ai/api-reference/introduction",
+      "note": "No quick start: with FIREWORKS_BASE_URL set the SDK drops the /inference path.",
+      "hosts": [
+        "api.fireworks.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "FIREWORKS_API_KEY"
+      ],
+      "statusPage": "https://status.fireworks.ai",
+      "usage": {
+        "operations": [
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/inference/v1/chat/completions"
+          },
+          {
+            "name": "completions",
+            "method": "POST",
+            "path": "/inference/v1/completions"
+          },
+          {
+            "name": "embeddings",
+            "method": "POST",
+            "path": "/inference/v1/embeddings"
+          }
+        ],
+        "model": "model|response.model|request:model",
+        "input": [
+          "usage.prompt_tokens|header:fireworks-prompt-tokens"
+        ],
+        "cached": [
+          "usage.prompt_tokens_details.cached_tokens|header:fireworks-cached-prompt-tokens"
+        ],
+        "output": [
+          "usage.completion_tokens"
+        ]
+      }
+    },
+    {
+      "id": "cohere",
+      "name": "Cohere",
+      "category": "llm",
+      "docs": "https://docs.cohere.com/reference/chat",
+      "hosts": [
+        "api.cohere.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "CO_API_URL"
+      },
+      "envVars": [
+        "CO_API_KEY",
+        "COHERE_API_KEY"
+      ],
+      "statusPage": "https://status.cohere.com",
+      "usage": {
+        "operations": [
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/v2/chat"
+          },
+          {
+            "name": "embed",
+            "method": "POST",
+            "path": "/v2/embed"
+          },
+          {
+            "name": "rerank",
+            "method": "POST",
+            "path": "/v2/rerank"
+          },
+          {
+            "name": "chat_v1",
+            "method": "POST",
+            "path": "/v1/chat"
+          }
+        ],
+        "model": "request:model",
+        "input": [
+          "usage.billed_units.input_tokens|delta.usage.billed_units.input_tokens|meta.billed_units.input_tokens|response.meta.billed_units.input_tokens"
+        ],
+        "output": [
+          "usage.billed_units.output_tokens|delta.usage.billed_units.output_tokens|meta.billed_units.output_tokens|response.meta.billed_units.output_tokens"
+        ],
+        "units": [
+          "meta.billed_units.search_units"
+        ],
+        "unitName": "search units"
+      }
+    },
+    {
+      "id": "perplexity",
+      "name": "Perplexity",
+      "category": "llm",
+      "docs": "https://docs.perplexity.ai/api-reference/chat-completions-post",
+      "hosts": [
+        "api.perplexity.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "PERPLEXITY_BASE_URL"
+      },
+      "envVars": [
+        "PERPLEXITY_API_KEY"
+      ],
+      "statusPage": "https://status.perplexity.com",
+      "usage": {
+        "operations": [
+          {
+            "name": "agent",
+            "method": "POST",
+            "path": "/v1/agent"
+          },
+          {
+            "name": "responses",
+            "method": "POST",
+            "path": "/v1/responses"
+          },
+          {
+            "name": "sonar",
+            "method": "POST",
+            "path": "/v1/sonar"
+          },
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/chat/completions"
+          },
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/orchestrator/v1/chat/completions"
+          },
+          {
+            "name": "responses",
+            "method": "POST",
+            "path": "/orchestrator/v1/responses"
+          },
+          {
+            "name": "messages",
+            "method": "POST",
+            "path": "/orchestrator/v1/messages"
+          },
+          {
+            "name": "search",
+            "method": "POST",
+            "path": "/search"
+          },
+          {
+            "name": "embeddings",
+            "method": "POST",
+            "path": "/v1/embeddings"
+          }
+        ],
+        "model": "model|response.model|request:model",
+        "input": [
+          "usage.input_tokens|usage.prompt_tokens|response.usage.input_tokens"
+        ],
+        "output": [
+          "usage.output_tokens|usage.completion_tokens|response.usage.output_tokens"
+        ],
+        "cost": "usage.cost.total_cost|response.usage.cost.total_cost",
+        "quota": {
+          "requests": "x-ratelimit-remaining"
+        }
+      }
+    },
+    {
+      "id": "replicate",
+      "name": "Replicate",
+      "category": "llm",
+      "docs": "https://replicate.com/docs/reference/http",
+      "hosts": [
+        "api.replicate.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "REPLICATE_API_TOKEN"
+      ],
+      "note": "No quick start: REPLICATE_BASE_URL means the bare host to the Python SDK 1.x but includes /v1 for the CLI and SDK 2.x."
+    },
+    {
+      "id": "huggingface",
+      "name": "Hugging Face",
+      "category": "llm",
+      "docs": "https://huggingface.co/docs/inference-providers/index",
+      "hosts": [
+        "router.huggingface.co",
+        "huggingface.co"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "HF_TOKEN",
+        "HUGGING_FACE_HUB_TOKEN"
+      ]
+    },
+    {
+      "id": "elevenlabs",
+      "name": "ElevenLabs",
+      "category": "speech",
+      "docs": "https://elevenlabs.io/docs/api-reference/authentication",
+      "hosts": [
+        "api.elevenlabs.io",
+        "api.us.elevenlabs.io",
+        "api.eu.residency.elevenlabs.io",
+        "api.in.residency.elevenlabs.io",
+        "api.sg.residency.elevenlabs.io"
+      ],
+      "auth": {
+        "header": "xi-api-key",
+        "format": "{key}"
+      },
+      "envVars": [
+        "ELEVENLABS_API_KEY"
+      ]
+    },
+    {
+      "id": "supabase",
+      "name": "Supabase Management API",
+      "category": "database",
+      "docs": "https://supabase.com/docs/reference/api/introduction",
+      "note": "Personal access tokens (sbp_\u2026). Not the per-project data API (*.supabase.co), which uses anon and service keys.",
+      "hosts": [
+        "api.supabase.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "SUPABASE_API_URL"
+      },
+      "envVars": [
+        "SUPABASE_ACCESS_TOKEN"
+      ]
+    },
+    {
+      "id": "neon",
+      "name": "Neon",
+      "category": "database",
+      "docs": "https://neon.com/docs/reference/api",
+      "hosts": [
+        "console.neon.tech"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "NEON_API_HOST",
+        "path": "/api/v2"
+      },
+      "envVars": [
+        "NEON_API_KEY"
+      ]
+    },
+    {
+      "id": "pinecone",
+      "name": "Pinecone",
+      "category": "database",
+      "docs": "https://docs.pinecone.io/reference/api/authentication",
+      "note": "Index hosts vary per index, hence the wildcard; no quick start for them.",
+      "hosts": [
+        "api.pinecone.io",
+        "*.pinecone.io"
+      ],
+      "auth": {
+        "header": "Api-Key",
+        "format": "{key}"
+      },
+      "envVars": [
+        "PINECONE_API_KEY"
+      ]
+    },
+    {
+      "id": "railway",
+      "name": "Railway",
+      "category": "infrastructure",
+      "docs": "https://docs.railway.com/integrations/api",
+      "note": "Account and workspace tokens. Project tokens (RAILWAY_TOKEN) use a Project-Access-Token header and aren't supported.",
+      "hosts": [
+        "backboard.railway.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "RAILWAY_API_TOKEN"
+      ]
+    },
+    {
+      "id": "netlify",
+      "name": "Netlify",
+      "category": "infrastructure",
+      "docs": "https://docs.netlify.com/api/get-started/",
+      "hosts": [
+        "api.netlify.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "NETLIFY_API_URL",
+        "path": "/api/v1"
+      },
+      "envVars": [
+        "NETLIFY_AUTH_TOKEN"
+      ]
+    },
+    {
+      "id": "render",
+      "name": "Render",
+      "category": "infrastructure",
+      "docs": "https://api-docs.render.com/reference/authentication",
+      "hosts": [
+        "api.render.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "RENDER_HOST",
+        "path": "/v1/"
+      },
+      "envVars": [
+        "RENDER_API_KEY"
+      ]
+    },
+    {
+      "id": "digitalocean",
+      "name": "DigitalOcean",
+      "category": "infrastructure",
+      "docs": "https://docs.digitalocean.com/reference/api/reference/",
+      "hosts": [
+        "api.digitalocean.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "DIGITALOCEAN_API_URL",
+        "path": "/"
+      },
+      "envVars": [
+        "DIGITALOCEAN_ACCESS_TOKEN",
+        "DIGITALOCEAN_TOKEN"
+      ]
+    },
+    {
+      "id": "sentry",
+      "name": "Sentry",
+      "category": "observability",
+      "docs": "https://docs.sentry.io/api/auth/",
+      "note": "Auth tokens (Bearer). Event ingest uses the DSN, not this token.",
+      "hosts": [
+        "sentry.io",
+        "us.sentry.io",
+        "de.sentry.io"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "SENTRY_URL",
+        "path": "/"
+      },
+      "envVars": [
+        "SENTRY_AUTH_TOKEN"
+      ]
+    },
+    {
+      "id": "gitlab",
+      "name": "GitLab",
+      "category": "code",
+      "docs": "https://docs.gitlab.com/api/rest/authentication/",
+      "note": "Personal, project and group tokens, in PRIVATE-TOKEN or Authorization: Bearer. CI job tokens (JOB-TOKEN) aren't supported.",
+      "hosts": [
+        "gitlab.com"
+      ],
+      "auth": {
+        "header": "PRIVATE-TOKEN",
+        "format": "{key}"
+      },
+      "envVars": [
+        "GITLAB_TOKEN"
+      ]
+    },
+    {
+      "id": "npm",
+      "name": "npm registry",
+      "category": "code",
+      "docs": "https://docs.npmjs.com/using-private-packages-in-a-ci-cd-workflow",
+      "note": "npm reads NPM_TOKEN through an .npmrc line: //registry.npmjs.org/:_authToken=${NPM_TOKEN}.",
+      "hosts": [
+        "registry.npmjs.org"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "NPM_TOKEN"
+      ]
+    },
+    {
+      "id": "linear",
+      "name": "Linear",
+      "category": "productivity",
+      "docs": "https://linear.app/developers/graphql",
+      "note": "Personal API keys are sent raw, without Bearer.",
+      "hosts": [
+        "api.linear.app"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "{key}"
+      },
+      "envVars": []
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "category": "productivity",
+      "docs": "https://developers.notion.com/reference/authentication",
+      "hosts": [
+        "api.notion.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "NOTION_ACCESS_TOKEN"
+      ]
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "category": "messaging",
+      "docs": "https://docs.slack.dev/apis/web-api/",
+      "note": "The token must be in the Authorization header; a token in a form field isn't swapped.",
+      "hosts": [
+        "slack.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "SLACK_BOT_TOKEN"
+      ]
+    },
+    {
+      "id": "twilio",
+      "name": "Twilio",
+      "category": "messaging",
+      "docs": "https://www.twilio.com/docs/usage/requests-to-twilio",
+      "note": "Basic auth: the account or API key SID stays real as the user name; the proxy token is the password. Apps that check webhook signatures with TWILIO_AUTH_TOKEN need the real token for that, so don't run them under keystub run.",
+      "hosts": [
+        "*.twilio.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "TWILIO_AUTH_TOKEN",
+        "TWILIO_API_SECRET"
+      ]
+    },
+    {
+      "id": "sendgrid",
+      "name": "SendGrid",
+      "category": "email",
+      "docs": "https://www.twilio.com/docs/sendgrid/api-reference/how-to-use-the-sendgrid-v3-api/authentication",
+      "hosts": [
+        "api.sendgrid.com",
+        "api.eu.sendgrid.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "SENDGRID_API_KEY"
+      ]
+    },
+    {
+      "id": "postmark",
+      "name": "Postmark",
+      "category": "email",
+      "docs": "https://postmarkapp.com/developer/api/overview",
+      "note": "Server tokens only; account-token endpoints (X-Postmark-Account-Token) aren't supported.",
+      "hosts": [
+        "api.postmarkapp.com"
+      ],
+      "auth": {
+        "header": "X-Postmark-Server-Token",
+        "format": "{key}"
+      },
+      "envVars": [
+        "POSTMARK_SERVER_TOKEN"
+      ]
+    },
+    {
+      "id": "algolia",
+      "name": "Algolia",
+      "category": "search",
+      "docs": "https://www.algolia.com/doc/rest-api/search/",
+      "note": "The application ID (x-algolia-application-id) isn't secret and stays real.",
+      "hosts": [
+        "*.algolia.net",
+        "*.algolianet.com"
+      ],
+      "auth": {
+        "header": "x-algolia-api-key",
+        "format": "{key}"
+      },
+      "envVars": [
+        "ALGOLIA_API_KEY"
+      ]
+    }
+  ]
+}

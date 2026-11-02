@@ -1,0 +1,17 @@
+{
+  "name": "keystub",
+  "owner": {
+    "name": "Keystub",
+    "url": "https://keystub.app"
+  },
+  "metadata": {
+    "description": "The Keystub skill for Claude Code: keep real API keys out of .env files, sandboxes and agents."
+  },
+  "plugins": [
+    {
+      "name": "keystub",
+      "source": "./",
+      "description": "Move real API keys out of .env files, sandboxes and agents with Keystub."
+    }
+  ]
+}

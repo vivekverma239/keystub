@@ -1,0 +1,3 @@
+interface:
+  display_name: "Keystub"
+  short_description: "Keep real API keys out of .env files, sandboxes and agents"

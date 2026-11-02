@@ -1,0 +1,24 @@
+{{define "content"}}
+<h1>Setup</h1>
+<h2>Run a command through Keystub</h2>
+<pre>keystub run -- npm run dev
+keystub run --env my-app/prod -- node server.js</pre>
+<p>This gives the command its own proxy token in that environment (named after the git worktree), points it at the proxy, and sets each service's key variable to that token. Without --env it uses $KEYSTUB_ENV, else default/dev.</p>
+{{if .Data.QuickStart}}<h2>Quick start, without the proxy</h2>
+<p>SDKs with a base-URL setting can call Keystub directly: no proxy, no CA. Set these, and set the service's key variable to a proxy token from the Tokens page, or let <code>keystub env --direct</code> print them all.</p>
+<pre>{{range .Data.QuickStart}}{{.}}
+{{end}}</pre>
+{{end}}
+<h2>Use it in every shell in a repo</h2>
+<p>Add this to the repo's <code>.envrc</code> (direnv). Each worktree gets its own key.</p>
+<pre>eval "$(keystub env)"</pre>
+<h2>Details</h2>
+<table>
+  <tr><th>Proxy</th><td class="mono">{{.Data.ProxyAddr}}</td></tr>
+  {{if .Data.EdgeAddr}}<tr><th>Edge (/s and /h)</th><td class="mono">{{.Data.EdgeAddr}}</td></tr>{{end}}
+  <tr><th>Master key</th><td>{{.Data.SecretsIn}}</td></tr>
+  <tr><th>CA certificate</th><td class="mono">{{.Data.CAPath}}</td></tr>
+  <tr><th>CA bundle</th><td class="mono">{{.Data.BundlePath}}</td></tr>
+</table>
+<p class="muted">Node uses the CA through <code>NODE_EXTRA_CA_CERTS</code>; Python, curl and OpenSSL use the bundle through <code>SSL_CERT_FILE</code>. Nothing is added to the macOS keychain.</p>
+{{end}}

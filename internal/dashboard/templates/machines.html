@@ -1,0 +1,55 @@
+{{define "content"}}
+<h1>Machines</h1>
+{{if .Data.Approved}}
+<div class="notice"><strong>{{.Data.Approved.Name}}</strong> is linked. Its <code>keystub link</code> finishes within a few seconds.</div>
+{{end}}
+
+<h2>Approve a machine</h2>
+{{if .Data.Confirm}}{{with .Data.Confirm}}
+<p>Code <code>{{$.Data.ConfirmCode}}</code> belongs to <strong>{{.Name}}</strong>, from <span class="mono">{{if .From}}{{.From}}{{else}}an unknown address{{end}}</span>, asked at {{clock .CreatedAt}}. Approve it only if that is the machine showing this code.</p>
+{{end}}
+<form method="post" action="/machines/approve" autocomplete="off">
+  <input type="hidden" name="code" value="{{.Data.ConfirmCode}}">
+  <input type="hidden" name="env" value="{{.Env.ID}}">
+  <p class="field">Environments it may get tokens in</p>
+  <div class="checks">{{$def := .Data.DefaultEnv}}{{$retry := .Data.Retry}}{{$tick := .Data.Ticked}}{{range .Envs}}<label><input type="checkbox" name="envs" value="{{.ID}}" {{if $retry}}{{if index $tick .ID}}checked{{end}}{{else if eq .ID $def}}checked{{end}}> {{.ID}}</label>{{end}}</div>
+  <p class="muted">These environments are the machine's only limit: any program running as its user can read the machine's credential and get tokens in each of them. Tick production only for a machine you'd trust with its keys.</p>
+  <p class="row"><button class="primary" name="action" value="approve">Approve</button><button class="danger" name="action" value="deny">Turn down</button></p>
+</form>
+{{else if .Data.Pending}}
+<form method="post" action="/machines/check" autocomplete="off">
+  <input type="hidden" name="env" value="{{.Env.ID}}">
+  <div class="grid">
+    <label class="field">Code shown by <code>keystub link</code><input name="code" placeholder="BCDF-2345" required autofocus></label>
+  </div>
+  <p class="row"><button class="primary">Continue</button></p>
+</form>
+<table>
+  <tr><th>Waiting</th><th>From</th><th>Asked</th><th>Expires</th><th></th></tr>
+  {{range .Data.Pending}}<tr><td><strong>{{.Name}}</strong></td><td class="mono">{{.From}}</td><td>{{clock .CreatedAt}}</td><td>{{clock .ExpiresAt}}</td><td><form class="inline" method="post" action="/machines/pending/{{.ID}}/deny"><button class="danger">Turn down</button></form></td></tr>{{end}}
+</table>
+{{if .Data.MorePending}}<p class="muted">And {{.Data.MorePending}} more waiting. Type the code a machine shows to find it.</p>{{end}}
+{{else}}
+<p class="muted">No machine is waiting. On the machine, run <code>keystub link {{.Data.EdgeURL}}</code>, then type the code it shows here.</p>
+{{end}}
+
+<h2>Linked</h2>
+{{if .Data.Machines}}
+<table>
+  <tr><th>Machine</th><th>Environments</th><th>Linked</th><th>Last seen</th><th>Tokens</th><th>State</th><th></th></tr>
+  {{range .Data.Machines}}
+  <tr>
+    <td><strong>{{.Name}}</strong> <span class="tag">{{.ID}}</span></td>
+    <td>{{range .Envs}}<span class="tag">{{.}}</span>{{end}}</td>
+    <td>{{date .CreatedAt}}</td>
+    <td>{{if .LastSeen}}{{when .LastSeen}}{{else}}<span class="muted">Never</span>{{end}}</td>
+    <td>{{.Tokens}}</td>
+    <td>{{if .RevokedAt}}<span class="muted">Revoked</span>{{else}}<span class="good">Active</span>{{end}}</td>
+    <td>{{if not .RevokedAt}}<form class="inline" method="post" action="/machines/{{.ID}}/revoke"><button class="danger">Revoke</button></form>{{else if .Unmarked}}<form class="inline" method="post" action="/machines/{{.ID}}/revoke"><button class="danger">Retry revoke</button></form>{{end}}</td>
+  </tr>
+  {{end}}
+</table>
+{{else}}
+<p class="muted">No machines linked yet.</p>
+{{end}}
+{{end}}

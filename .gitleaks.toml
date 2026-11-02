@@ -1,0 +1,11 @@
+# Extends gitleaks' default rules. Allowlisted paths hold only made-up
+# values, checked by hand.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Made-up proxy tokens and fake keys in the conformance cases; a throwaway CA for a fixture account, trusted by nothing"
+paths = [
+  '''^conformance/swap\.json$''',
+  '''^internal/gateway/testdata/worker-ca-key\.pem$''',
+]

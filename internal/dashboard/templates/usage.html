@@ -1,0 +1,46 @@
+{{define "content"}}{{$d := .Data}}
+<h1>Usage</h1>
+{{if not $d.Available}}
+<p class="muted">This storage keeps no usage metrics.</p>
+{{else}}
+<div class="row bar-controls">
+  <div class="envs">{{range $d.Ranges}}<a href="/usage?range={{.}}&in={{$d.In}}&by={{$d.By}}" {{if eq . $d.Range}}class="on"{{end}}>{{.}}</a>{{end}}</div>
+  <div class="envs"><a href="/usage?range={{$d.Range}}&in=&by={{$d.By}}" {{if eq $d.In ""}}class="on"{{end}}>All environments</a>{{range $d.Envs}}<a href="/usage?range={{$d.Range}}&in={{.}}&by={{$d.By}}" {{if eq . $d.In}}class="on"{{end}}>{{.}}</a>{{end}}</div>
+</div>
+<h2>Requests by {{$d.BarsBy}}</h2>
+<div class="bars">{{range $d.Bars}}<div class="bar" title="{{.Label}}: {{num .N}} requests"><span style="height:{{.Pct}}%"></span></div>{{end}}</div>
+<div class="row bar-controls">
+  <h2>By {{$d.By}}</h2>
+  <div class="envs">{{range $d.Bys}}<a href="/usage?range={{$d.Range}}&in={{$d.In}}&by={{.}}" {{if eq . $d.By}}class="on"{{end}}>{{.}}</a>{{end}}</div>
+  <div class="envs"><a href="/usage/export?format=csv&range={{$d.Range}}&in={{$d.In}}">⤓ CSV</a><a href="/usage/export?format=json&range={{$d.Range}}&in={{$d.In}}">⤓ JSON</a></div>
+</div>
+{{if $d.Rows}}
+<table>
+  <tr><th>{{$d.By}}</th><th>Requests</th><th>OK</th><th>Key rejected</th><th>Rate limited</th><th>Errors</th><th>Refused</th><th>Input</th><th>Cached</th><th>Output</th><th>Cost</th><th>p50</th><th>p95</th><th>Keystub</th></tr>
+  {{range $d.Rows}}{{template "usagerow" .}}{{end}}
+  {{template "usagerow" $d.Total}}
+</table>
+<p class="muted">Tokens and cost are read from responses using the catalog; services without usage metadata count requests only. Cost uses the service's own report when it sends one, else list prices{{if $d.Total.Unpriced}}; {{num $d.Total.Unpriced}} requests had no known price{{end}}. Latencies are estimated from a histogram.</p>
+{{else}}
+<p class="muted">No requests in this range.</p>
+{{end}}
+{{end}}
+{{end}}
+{{define "usagerow"}}
+  <tr>
+    <td>{{if .Label}}{{.Label}}{{else}}<span class="muted">None</span>{{end}}{{if .Sub}} <span class="muted mono">{{.Sub}}</span>{{end}}</td>
+    <td>{{num .Requests}}</td>
+    <td>{{pct .OK .Requests}}</td>
+    <td>{{if .KeyRejected}}<span class="bad">{{num .KeyRejected}}</span>{{else}}<span class="muted">0</span>{{end}}</td>
+    <td>{{if .RateLimited}}<span class="bad">{{num .RateLimited}}</span>{{else}}<span class="muted">0</span>{{end}}</td>
+    <td>{{if .Errors}}<span class="bad">{{num .Errors}}</span>{{else}}<span class="muted">0</span>{{end}}</td>
+    <td>{{num .Refused}}</td>
+    <td>{{num .InputTokens}}</td>
+    <td>{{num .CachedTokens}}</td>
+    <td>{{num .OutputTokens}}</td>
+    <td>{{usd .CostUSD}}</td>
+    <td>{{.P50Ms}} ms</td>
+    <td>{{.P95Ms}} ms</td>
+    <td class="muted">{{.KeystubAvgMs}} ms</td>
+  </tr>
+{{end}}

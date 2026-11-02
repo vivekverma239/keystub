@@ -1,0 +1,48 @@
+{{define "content"}}
+<h1>Saved keys</h1>
+{{$env := .Env.ID}}
+{{if .Data.Rows}}
+<table>
+  <tr><th>Key</th><th>Linked in</th><th>Limits</th><th>Today</th><th></th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><strong>{{.Name}}</strong> <span class="tag">{{.Service}}</span><div class="muted mono">{{.ID}} · v{{.Version}}, set {{date .SetAt}}</div></td>
+    <td>{{if .LinkedIn}}{{range .LinkedIn}}<a class="tag" href="/services?env={{.}}">{{.}}</a>{{end}}{{else}}<span class="muted">Nowhere</span>{{end}}</td>
+    <td>{{limits .Limits}}
+      <form class="inline" method="post" action="/keys/{{.ID}}/limits"><input type="hidden" name="env" value="{{$env}}">
+        <input name="dailyRequests" size="7" placeholder="Per day" value="{{if .Limits.DailyRequests}}{{.Limits.DailyRequests}}{{end}}">
+        <input name="perMinute" size="7" placeholder="Per minute" value="{{if .Limits.PerMinute}}{{.Limits.PerMinute}}{{end}}">
+        <button>Save</button></form></td>
+    <td>{{if or .Limits.DailyRequests .Limits.PerMinute}}{{.UsedToday}}{{else}}<span class="muted">Not counted</span>{{end}}</td>
+    <td>
+      <form class="inline" method="post" action="/keys/{{.ID}}/replace" autocomplete="off"><input type="hidden" name="env" value="{{$env}}">
+        <input type="password" name="key" placeholder="New value" required><button class="primary">Replace</button></form>
+      <form class="inline" method="post" action="/keys/{{.ID}}/rename" autocomplete="off"><input type="hidden" name="env" value="{{$env}}">
+        <input name="name" size="12" value="{{.Name}}" required><button>Rename</button></form>
+      <form class="inline" method="post" action="/keys/{{.ID}}/delete"><input type="hidden" name="env" value="{{$env}}"><button class="danger" {{if .LinkedIn}}disabled title="Unlink it everywhere first"{{end}}>Delete</button></form>
+    </td>
+  </tr>
+  {{end}}
+</table>
+<p class="muted">A saved key is a real key stored once. Environments link it on the Services page. Replacing its value changes every environment that links it on the next request, with no token changes. A key that is still linked can't be deleted. Its limits cover every environment that uses it, and it's counted only while it has one.</p>
+{{else}}
+<p class="muted">No saved keys yet. Save one below, then link it into an environment on the Services page.</p>
+{{end}}
+
+{{if .Data.Services}}
+<h2>Save a key</h2>
+<form method="post" action="/keys" autocomplete="off">
+  <input type="hidden" name="env" value="{{$env}}">
+  <div class="grid">
+    <label class="field">Service<select name="service">{{range .Data.Services}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label>
+    <label class="field">Name<input name="name" placeholder="team" required></label>
+    <label class="field">Real key<input type="password" name="key" required></label>
+    <label class="field">Daily requests<input name="dailyRequests" inputmode="numeric" placeholder="No limit"></label>
+    <label class="field">Per minute<input name="perMinute" inputmode="numeric" placeholder="No limit"></label>
+  </div>
+  <p><button class="primary">Save key</button></p>
+</form>
+{{else}}
+<p class="muted">Add a service on the Services page first.</p>
+{{end}}
+{{end}}

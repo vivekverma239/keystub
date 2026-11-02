@@ -1,0 +1,26 @@
+{{define "content"}}
+<h1>Requests</h1>
+{{if .Data}}
+<table>
+  <tr><th>Time</th><th>Environment</th><th>Token</th><th>Service</th><th>Request</th><th>Status</th><th>Model</th><th>Tokens</th><th>Cost</th><th>Duration</th><th>Keystub</th></tr>
+  {{range .Data}}
+  <tr>
+    <td class="mono">{{clock .Time}}</td>
+    <td class="mono">{{.Env}}</td>
+    <td>{{if .Key}}{{.Key}}{{else}}<span class="muted">Unknown</span>{{end}}</td>
+    <td>{{.Service}}</td>
+    <td class="mono">{{.Method}} {{.Host}}{{.Path}}</td>
+    <td>{{if lt .Status 400}}<span class="good">{{.Status}}</span>{{else}}<span class="bad">{{.Status}}</span>{{end}}{{if .Note}} <span class="muted">{{.Note}}</span>{{else if eq .Outcome "key_rejected"}} <span class="bad">real key rejected</span>{{else if eq .Outcome "rate_limited"}} <span class="muted">rate-limited by {{.Service}}</span>{{else if eq .Outcome "upstream_error"}}{{with statusPage .Service}} <a class="muted" href="{{.}}" rel="noreferrer" target="_blank">status</a>{{end}}{{end}}</td>
+    <td class="mono">{{.Model}}</td>
+    <td class="mono">{{with .Usage}}{{num .InputTokens}} → {{num .OutputTokens}}{{if .Units}} · {{num .Units}} units{{end}}{{end}}</td>
+    <td>{{micros .CostMicros}}</td>
+    <td>{{.DurationMs}} ms</td>
+    <td class="muted">{{if .Note}}—{{else if .OverheadMs}}{{.OverheadMs}} ms{{else}}&lt;1 ms{{end}}</td>
+  </tr>
+  {{end}}
+</table>
+<p class="muted">Updates every 5 seconds. Only intercepted requests are listed; other hosts pass through untouched.</p>
+{{else}}
+<p class="muted">No requests yet. Start something with <code>keystub run -- …</code> and call one of your services.</p>
+{{end}}
+{{end}}

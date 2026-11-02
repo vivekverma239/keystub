@@ -1,0 +1,48 @@
+{{define "content"}}
+<h1>Tokens in {{.Env.ID}}</h1>
+{{$env := .Env.ID}}
+{{if .Data.NewToken}}
+<div class="notice">
+  <strong>{{.Data.NewName}}</strong> is ready. Copy it now; use it as the API key, or let <code>keystub run</code> set it for you:
+  <pre>{{.Data.NewToken}}</pre>
+  It only works through this proxy, in {{$env}}. It isn't shown again.
+</div>
+{{end}}
+
+{{if .Data.Rows}}
+<table>
+  <tr><th>Token</th><th>Services</th><th>Limits</th><th>Expires</th><th>Today</th><th>State</th><th></th></tr>
+  {{range .Data.Rows}}
+  <tr>
+    <td><strong>{{.Name}}</strong>{{if .Principal}} <span class="tag">{{.Principal}}</span>{{end}}</td>
+    <td>{{if .Service}}<span class="tag">{{.Service}}</span>{{else}}<span class="muted">All linked</span>{{end}}</td>
+    <td>{{limits .Limits}}</td>
+    <td>{{if .ExpiresAt}}{{when .ExpiresAt}}{{else}}<span class="muted">Never</span>{{end}}</td>
+    <td>{{.UsedToday}}</td>
+    <td>{{if eq .State "active"}}<span class="good">Active</span>{{else}}<span class="muted">{{.State}}</span>{{end}}</td>
+    <td>{{if eq .State "active"}}<form class="inline" method="post" action="/tokens/{{.ID}}/revoke"><input type="hidden" name="env" value="{{$env}}"><button class="danger">Revoke</button></form>{{end}}</td>
+  </tr>
+  {{end}}
+</table>
+{{else}}
+<p class="muted">No tokens in {{$env}} yet. <code>keystub run</code> creates one per worktree, or create one below.</p>
+{{end}}
+
+<h2>Create a token</h2>
+<form method="post" action="/tokens" autocomplete="off">
+  <input type="hidden" name="env" value="{{$env}}">
+  <div class="grid">
+    <label class="field">Name<input name="name" placeholder="ci-agent" required></label>
+    <label class="field">Daily requests<input name="dailyRequests" inputmode="numeric" placeholder="No limit"></label>
+    <label class="field">Per minute<input name="perMinute" inputmode="numeric" placeholder="No limit"></label>
+    <label class="field">Lifetime<input name="ttl" placeholder="Never, or 2h, 7d"></label>
+  </div>
+  <p class="field">Works for</p>
+  <div class="checks">
+    <label><input type="radio" name="service" value="" checked> Every service {{$env}} links (an environment token)</label>
+    {{range .Data.Services}}<label><input type="radio" name="service" value="{{.ID}}"> Only {{.Name}} (a service token)</label>{{end}}
+  </div>
+  <p class="muted">Both kinds follow the environment's links: switching a service to another saved key moves them too.</p>
+  <p><button class="primary">Create token</button></p>
+</form>
+{{end}}

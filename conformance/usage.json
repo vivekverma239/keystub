@@ -1,0 +1,1338 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "openai chat with cache reads and writes, priced",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "x-ratelimit-remaining-requests": "499",
+          "x-ratelimit-remaining-tokens": "149000"
+        },
+        "body": "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion\",\"model\":\"gpt-6-sol\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"hi \\\"usage\\\":{\\\"prompt_tokens\\\":999}\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1200,\"completion_tokens\":300,\"total_tokens\":1500,\"prompt_tokens_details\":{\"cached_tokens\":200,\"cache_write_tokens\":100},\"completion_tokens_details\":{\"reasoning_tokens\":120}}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "gpt-6-sol",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 1200,
+          "cachedTokens": 200,
+          "cacheWriteTokens": 100,
+          "outputTokens": 300,
+          "units": 0
+        },
+        "costMicros": 5090,
+        "quota": {
+          "requestsLeft": 499,
+          "tokensLeft": 149000
+        }
+      }
+    },
+    {
+      "name": "openai chat stream with include_usage, dated snapshot",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"c\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-6-luna-2026-09-22\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hel\"}}],\"usage\":null}\n\ndata: {\"id\":\"c\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-6-luna-2026-09-22\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":null}\n\ndata: {\"id\":\"c\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-6-luna-2026-09-22\",\"choices\":[],\"usage\":{\"prompt_tokens\":50,\"completion_tokens\":10,\"total_tokens\":60}}\n\ndata: [DONE]\n\n"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "gpt-6-luna-2026-09-22",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 50,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 10,
+          "units": 0
+        },
+        "costMicros": 10
+      }
+    },
+    {
+      "name": "openai chat stream without usage",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"c\",\"model\":\"gpt-6-sol\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"x\"}}]}\n\ndata: [DONE]\n\n"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "gpt-6-sol",
+        "outcome": "ok"
+      }
+    },
+    {
+      "name": "openai responses stream",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/responses"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"r\",\"model\":\"gpt-6.1-terra\",\"usage\":null}}\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"usage\"}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"r\",\"model\":\"gpt-6.1-terra\",\"usage\":{\"input_tokens\":1000,\"input_tokens_details\":{\"cached_tokens\":400,\"cache_write_tokens\":0},\"output_tokens\":200,\"output_tokens_details\":{\"reasoning_tokens\":50},\"total_tokens\":1200}}}\n\n"
+      },
+      "expect": {
+        "operation": "responses",
+        "model": "gpt-6.1-terra",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 1000,
+          "cachedTokens": 400,
+          "cacheWriteTokens": 0,
+          "outputTokens": 200,
+          "units": 0
+        },
+        "costMicros": 1620
+      }
+    },
+    {
+      "name": "openai long context tier",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/responses"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"model\":\"gpt-6.1-sol\",\"usage\":{\"input_tokens\":300000,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":1000}}"
+      },
+      "expect": {
+        "operation": "responses",
+        "model": "gpt-6.1-sol",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 300000,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 1000,
+          "units": 0
+        },
+        "costMicros": 1215000
+      }
+    },
+    {
+      "name": "openai embeddings",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/embeddings"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[0.1,-0.2,0.3]}],\"model\":\"text-embedding-3-small\",\"usage\":{\"prompt_tokens\":8,\"total_tokens\":8}}"
+      },
+      "expect": {
+        "operation": "embeddings",
+        "model": "text-embedding-3-small",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 8,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 0,
+          "units": 0
+        },
+        "costMicros": 0
+      }
+    },
+    {
+      "name": "openai rejects the real key",
+      "service": "openai",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"error\":{\"message\":\"Incorrect API key provided\",\"type\":\"invalid_request_error\"}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "",
+        "outcome": "key_rejected"
+      }
+    },
+    {
+      "name": "openai rate limit with quota headers",
+      "service": "openai",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 429,
+        "headers": {
+          "Content-Type": "application/json",
+          "x-ratelimit-remaining-requests": "0",
+          "x-ratelimit-remaining-tokens": "0"
+        },
+        "body": "{\"error\":{\"message\":\"Rate limit reached\"}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "",
+        "outcome": "rate_limited",
+        "quota": {
+          "requestsLeft": 0,
+          "tokensLeft": 0
+        }
+      }
+    },
+    {
+      "name": "openai unknown path has no operation",
+      "service": "openai",
+      "request": {
+        "method": "GET",
+        "path": "/v1/models"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"object\":\"list\",\"data\":[{\"id\":\"gpt-6-sol\"}]}"
+      },
+      "expect": {
+        "operation": "",
+        "model": "",
+        "outcome": "ok"
+      }
+    },
+    {
+      "name": "anthropic message with cache",
+      "service": "anthropic",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/messages"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "anthropic-ratelimit-requests-remaining": "49",
+          "anthropic-ratelimit-tokens-remaining": "80000"
+        },
+        "body": "{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-5-5\",\"content\":[{\"type\":\"text\",\"text\":\"Hi\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":100,\"cache_read_input_tokens\":1000,\"cache_creation_input_tokens\":200,\"cache_creation\":{\"ephemeral_5m_input_tokens\":200,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":50,\"output_tokens_details\":{\"thinking_tokens\":10}}}"
+      },
+      "expect": {
+        "operation": "messages",
+        "model": "claude-sonnet-5-5",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 1300,
+          "cachedTokens": 1000,
+          "cacheWriteTokens": 200,
+          "outputTokens": 50,
+          "units": 0
+        },
+        "costMicros": 1300,
+        "quota": {
+          "requestsLeft": 49,
+          "tokensLeft": 80000
+        }
+      }
+    },
+    {
+      "name": "anthropic stream: input from message_start, output from message_delta",
+      "service": "anthropic",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/messages"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-haiku-5-5\",\"content\":[],\"usage\":{\"input_tokens\":25,\"cache_read_input_tokens\":0,\"cache_creation_input_tokens\":0,\"output_tokens\":1}}}\n\nevent: ping\ndata: {\"type\":\"ping\"}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"usage\"}}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":15}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      },
+      "expect": {
+        "operation": "messages",
+        "model": "claude-haiku-5-5",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 25,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 15,
+          "units": 0
+        },
+        "costMicros": 10
+      }
+    },
+    {
+      "name": "anthropic stream: message_delta repeats cumulative input and cache counts",
+      "service": "anthropic",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/messages"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-opus-5-5\",\"usage\":{\"input_tokens\":10,\"cache_read_input_tokens\":0,\"output_tokens\":1}}}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"input_tokens\":12,\"cache_read_input_tokens\":3000,\"cache_creation_input_tokens\":0,\"output_tokens\":400}}\n\n"
+      },
+      "expect": {
+        "operation": "messages",
+        "model": "claude-opus-5-5",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 3012,
+          "cachedTokens": 3000,
+          "cacheWriteTokens": 0,
+          "outputTokens": 400,
+          "units": 0
+        },
+        "costMicros": 8648
+      }
+    },
+    {
+      "name": "anthropic count_tokens isn't usage",
+      "service": "anthropic",
+      "request": {
+        "method": "POST",
+        "path": "/v1/messages/count_tokens",
+        "body": "{\"model\":\"claude-sonnet-5-5\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"input_tokens\":42}"
+      },
+      "expect": {
+        "operation": "count_tokens",
+        "model": "claude-sonnet-5-5",
+        "outcome": "ok"
+      }
+    },
+    {
+      "name": "anthropic overloaded",
+      "service": "anthropic",
+      "request": {
+        "method": "POST",
+        "path": "/v1/messages"
+      },
+      "response": {
+        "status": 529,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}"
+      },
+      "expect": {
+        "operation": "messages",
+        "model": "",
+        "outcome": "upstream_error"
+      }
+    },
+    {
+      "name": "gemini generateContent with thinking",
+      "service": "gemini",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1beta/models/gemini-3.8-flash:generateContent"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ok\"}],\"role\":\"model\"}}],\"usageMetadata\":{\"promptTokenCount\":100,\"cachedContentTokenCount\":40,\"candidatesTokenCount\":20,\"thoughtsTokenCount\":31,\"totalTokenCount\":151},\"modelVersion\":\"gemini-3.8-flash\"}"
+      },
+      "expect": {
+        "operation": "generate",
+        "model": "gemini-3.8-flash",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 100,
+          "cachedTokens": 40,
+          "cacheWriteTokens": 0,
+          "outputTokens": 51,
+          "units": 0
+        },
+        "costMicros": 239
+      }
+    },
+    {
+      "name": "gemini price change on a later date",
+      "service": "gemini",
+      "time": "2027-01-15T00:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1beta/models/gemini-3.8-flash:generateContent"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"usageMetadata\":{\"promptTokenCount\":1000,\"candidatesTokenCount\":100},\"modelVersion\":\"gemini-3.8-flash\"}"
+      },
+      "expect": {
+        "operation": "generate",
+        "model": "gemini-3.8-flash",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 1000,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 100,
+          "units": 0
+        },
+        "costMicros": 2250
+      }
+    },
+    {
+      "name": "gemini SSE stream takes the model from the path",
+      "service": "gemini",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1beta/models/gemini-3.6-flash:streamGenerateContent"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"a\"}]}}],\"usageMetadata\":{\"promptTokenCount\":10,\"candidatesTokenCount\":1,\"totalTokenCount\":11}}\n\ndata: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"b\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":10,\"candidatesTokenCount\":9,\"totalTokenCount\":19}}\n\n"
+      },
+      "expect": {
+        "operation": "stream",
+        "model": "gemini-3.6-flash",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 10,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 9,
+          "units": 0
+        },
+        "costMicros": 41
+      }
+    },
+    {
+      "name": "gemini stream without alt=sse is a JSON array",
+      "service": "gemini",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1beta/models/gemini-3.5-flash-lite:streamGenerateContent"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "[{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"a\"}]}}],\"usageMetadata\":{\"promptTokenCount\":4,\"candidatesTokenCount\":1}},\r\n{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"b\"}]}}],\"usageMetadata\":{\"promptTokenCount\":4,\"candidatesTokenCount\":6},\"modelVersion\":\"gemini-3.5-flash-lite\"}]"
+      },
+      "expect": {
+        "operation": "stream",
+        "model": "gemini-3.5-flash-lite",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 4,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 6,
+          "units": 0
+        },
+        "costMicros": 16
+      }
+    },
+    {
+      "name": "gemini embedContent",
+      "service": "gemini",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/models/gemini-embedding-001:embedContent"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"embedding\":{\"values\":[0.1,0.2]},\"usageMetadata\":{\"promptTokenCount\":12}}"
+      },
+      "expect": {
+        "operation": "embed",
+        "model": "gemini-embedding-001",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 12,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 0,
+          "units": 0
+        },
+        "costMicros": 2
+      }
+    },
+    {
+      "name": "xai reasoning is billed apart from completion; cost in ticks wins",
+      "service": "xai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"model\":\"grok-4.7\",\"choices\":[{\"message\":{\"content\":\"x\"}}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":9,\"total_tokens\":135,\"prompt_tokens_details\":{\"cached_tokens\":6},\"completion_tokens_details\":{\"reasoning_tokens\":94},\"cost_in_usd_ticks\":12345678900}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "grok-4.7",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 32,
+          "cachedTokens": 6,
+          "cacheWriteTokens": 0,
+          "outputTokens": 103,
+          "units": 0
+        },
+        "costMicros": 1234568
+      }
+    },
+    {
+      "name": "groq stream with usage only under x_groq",
+      "service": "groq",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/openai/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream",
+          "x-ratelimit-remaining-requests": "14399",
+          "x-ratelimit-remaining-tokens": "5900"
+        },
+        "body": "data: {\"id\":\"c\",\"model\":\"openai/gpt-oss-120b\",\"choices\":[{\"delta\":{\"content\":\"x\"}}],\"x_groq\":{\"id\":\"req_1\"}}\n\ndata: {\"id\":\"c\",\"model\":\"openai/gpt-oss-120b\",\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}],\"x_groq\":{\"id\":\"req_1\",\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":20,\"total_tokens\":120,\"prompt_tokens_details\":{\"cached_tokens\":40}}}}\n\ndata: [DONE]\n\n"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "openai/gpt-oss-120b",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 100,
+          "cachedTokens": 40,
+          "cacheWriteTokens": 0,
+          "outputTokens": 20,
+          "units": 0
+        },
+        "costMicros": 24,
+        "quota": {
+          "requestsLeft": 14399,
+          "tokensLeft": 5900
+        }
+      }
+    },
+    {
+      "name": "groq flex capacity is an upstream error",
+      "service": "groq",
+      "request": {
+        "method": "POST",
+        "path": "/openai/v1/chat/completions"
+      },
+      "response": {
+        "status": 498,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"error\":{\"message\":\"flex tier capacity exceeded\"}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "",
+        "outcome": "upstream_error"
+      }
+    },
+    {
+      "name": "mistral fim",
+      "service": "mistral",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/fim/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id\":\"x\",\"model\":\"codestral-2508\",\"choices\":[{\"message\":{\"content\":\"x\"}}],\"usage\":{\"prompt_tokens\":640,\"completion_tokens\":100,\"total_tokens\":740,\"prompt_tokens_details\":{\"cached_tokens\":128}}}"
+      },
+      "expect": {
+        "operation": "fim",
+        "model": "codestral-2508",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 640,
+          "cachedTokens": 128,
+          "cacheWriteTokens": 0,
+          "outputTokens": 100,
+          "units": 0
+        },
+        "costMicros": 247
+      }
+    },
+    {
+      "name": "openrouter reports cost in the response",
+      "service": "openrouter",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": ": OPENROUTER PROCESSING\n\ndata: {\"id\":\"g\",\"model\":\"anthropic/claude-sonnet-5-5\",\"choices\":[{\"delta\":{\"content\":\"x\"}}]}\n\ndata: {\"id\":\"g\",\"model\":\"anthropic/claude-sonnet-5-5\",\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":20,\"completion_tokens\":5,\"total_tokens\":25,\"cost\":0.000123,\"prompt_tokens_details\":{\"cached_tokens\":0}}}\n\ndata: [DONE]\n\n"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "anthropic/claude-sonnet-5-5",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 20,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 5,
+          "units": 0
+        },
+        "costMicros": 123
+      }
+    },
+    {
+      "name": "vercel ai gateway chat completion reports its cost",
+      "service": "vercel-ai-gateway",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id\":\"gen_1\",\"object\":\"chat.completion\",\"model\":\"anthropic/claude-sonnet-5-5\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Hi\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":7,\"total_tokens\":37,\"prompt_tokens_details\":{\"cached_tokens\":10},\"cost\":3.2e-06,\"market_cost\":3.2e-06}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "anthropic/claude-sonnet-5-5",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 30,
+          "cachedTokens": 10,
+          "cacheWriteTokens": 0,
+          "outputTokens": 7,
+          "units": 0
+        },
+        "costMicros": 3
+      }
+    },
+    {
+      "name": "vercel ai gateway anthropic messages",
+      "service": "vercel-ai-gateway",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/messages"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"anthropic/claude-haiku-5-5\",\"content\":[{\"type\":\"text\",\"text\":\"Hi\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":100,\"cache_read_input_tokens\":1000,\"cache_creation_input_tokens\":200,\"output_tokens\":50}}"
+      },
+      "expect": {
+        "operation": "messages",
+        "model": "anthropic/claude-haiku-5-5",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 1300,
+          "cachedTokens": 1000,
+          "cacheWriteTokens": 200,
+          "outputTokens": 50,
+          "units": 0
+        }
+      }
+    },
+    {
+      "name": "deepseek off-peak half price",
+      "service": "deepseek",
+      "time": "2026-10-17T02:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id\":\"x\",\"model\":\"deepseek-flash\",\"choices\":[{\"message\":{\"content\":\"x\"}}],\"usage\":{\"prompt_tokens\":1000,\"completion_tokens\":100,\"total_tokens\":1100,\"prompt_cache_hit_tokens\":600,\"prompt_cache_miss_tokens\":400,\"prompt_tokens_details\":{\"cached_tokens\":600}}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "deepseek-flash",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 1000,
+          "cachedTokens": 600,
+          "cacheWriteTokens": 0,
+          "outputTokens": 100,
+          "units": 0
+        },
+        "costMicros": 122
+      }
+    },
+    {
+      "name": "deepseek peak hours",
+      "service": "deepseek",
+      "time": "2026-10-19T02:30:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id\":\"x\",\"model\":\"deepseek-flash\",\"choices\":[{\"message\":{\"content\":\"x\"}}],\"usage\":{\"prompt_tokens\":1000,\"completion_tokens\":100,\"total_tokens\":1100,\"prompt_cache_hit_tokens\":600,\"prompt_cache_miss_tokens\":400,\"prompt_tokens_details\":{\"cached_tokens\":600}}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "deepseek-flash",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 1000,
+          "cachedTokens": 600,
+          "cacheWriteTokens": 0,
+          "outputTokens": 100,
+          "units": 0
+        },
+        "costMicros": 244
+      }
+    },
+    {
+      "name": "together cached tokens at the top of usage",
+      "service": "together",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"model\":\"moonshotai/Kimi-K3\",\"choices\":[{\"message\":{\"content\":\"x\"}}],\"usage\":{\"prompt_tokens\":1000,\"completion_tokens\":10,\"total_tokens\":1010,\"cached_tokens\":500}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "moonshotai/Kimi-K3",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 1000,
+          "cachedTokens": 500,
+          "cacheWriteTokens": 0,
+          "outputTokens": 10,
+          "units": 0
+        },
+        "costMicros": 1800
+      }
+    },
+    {
+      "name": "fireworks stream usage in a final chunk",
+      "service": "fireworks",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/inference/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": "data: {\"model\":\"accounts/fireworks/models/gpt-oss-120b\",\"choices\":[{\"delta\":{\"content\":\"x\"},\"index\":0}]}\n\ndata: {\"model\":\"accounts/fireworks/models/gpt-oss-120b\",\"choices\":[],\"usage\":{\"prompt_tokens\":2000,\"completion_tokens\":100,\"total_tokens\":2100,\"prompt_tokens_details\":{\"cached_tokens\":1000}}}\n\ndata: [DONE]\n\n"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "accounts/fireworks/models/gpt-oss-120b",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 2000,
+          "cachedTokens": 1000,
+          "cacheWriteTokens": 0,
+          "outputTokens": 100,
+          "units": 0
+        },
+        "costMicros": 225
+      }
+    },
+    {
+      "name": "cohere v2 stream: billed units in message-end, model from the request",
+      "service": "cohere",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v2/chat",
+        "body": "{\"messages\":[{\"role\":\"user\",\"content\":\"model: fake\"}],\"stream\":true,\"model\":\"command-r-08-2024\"}"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": "event: message-start\ndata: {\"type\":\"message-start\",\"id\":\"x\",\"delta\":{\"message\":{\"role\":\"assistant\"}}}\n\nevent: content-delta\ndata: {\"type\":\"content-delta\",\"index\":0,\"delta\":{\"message\":{\"content\":{\"text\":\"usage\"}}}}\n\nevent: message-end\ndata: {\"type\":\"message-end\",\"delta\":{\"finish_reason\":\"COMPLETE\",\"usage\":{\"billed_units\":{\"input_tokens\":30,\"output_tokens\":12},\"tokens\":{\"input_tokens\":230,\"output_tokens\":14}}}}\n\n"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "command-r-08-2024",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 30,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 12,
+          "units": 0
+        },
+        "costMicros": 12
+      }
+    },
+    {
+      "name": "cohere rerank search units stay unpriced with no unit price",
+      "service": "cohere",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v2/rerank",
+        "body": "{\"model\":\"rerank-v5.0-fast\",\"query\":\"q\",\"documents\":[\"a\"]}"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id\":\"x\",\"results\":[{\"index\":0,\"relevance_score\":0.9}],\"meta\":{\"billed_units\":{\"search_units\":1}}}"
+      },
+      "expect": {
+        "operation": "rerank",
+        "model": "rerank-v5.0-fast",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 0,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 0,
+          "units": 1
+        },
+        "costMicros": null
+      }
+    },
+    {
+      "name": "perplexity agent reports its own cost",
+      "service": "perplexity",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/agent"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "x-ratelimit-remaining": "49"
+        },
+        "body": "{\"id\":\"x\",\"model\":\"perplexity/sonar\",\"output\":[{\"type\":\"message\"}],\"usage\":{\"input_tokens\":400,\"output_tokens\":300,\"total_tokens\":700,\"cost\":{\"total_cost\":0.0067,\"input_cost\":0.0001,\"output_cost\":0.00075,\"currency\":\"USD\"}}}"
+      },
+      "expect": {
+        "operation": "agent",
+        "model": "perplexity/sonar",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 400,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 300,
+          "units": 0
+        },
+        "costMicros": 6700,
+        "quota": {
+          "requestsLeft": 49
+        }
+      }
+    },
+    {
+      "name": "a model name the service refused isn't taken from the request",
+      "service": "cohere",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v2/chat",
+        "body": "{\"model\": \"made-up-1\", \"messages\": []}"
+      },
+      "response": {
+        "status": 404,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"message\": \"model 'made-up-1' not found\"}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "",
+        "outcome": "client_error",
+        "usage": null,
+        "costMicros": null,
+        "quota": null
+      }
+    },
+    {
+      "name": "a model name in a refused request's path isn't taken either",
+      "service": "gemini",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1beta/models/made-up-2:generateContent"
+      },
+      "response": {
+        "status": 404,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"error\": {\"code\": 404, \"message\": \"models/made-up-2 is not found\"}}"
+      },
+      "expect": {
+        "operation": "generate",
+        "model": "",
+        "outcome": "client_error",
+        "usage": null,
+        "costMicros": null,
+        "quota": null
+      }
+    },
+    {
+      "name": "a number too large for a float keeps the one before",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"c\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-6-luna-2026-09-22\",\"choices\":[],\"usage\":{\"prompt_tokens\":50,\"completion_tokens\":10}}\n\ndata: {\"id\":\"c\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-6-luna-2026-09-22\",\"choices\":[],\"usage\":{\"prompt_tokens\":1e400,\"completion_tokens\":-1e400}}\n\ndata: [DONE]\n\n"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "gpt-6-luna-2026-09-22",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 50,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 10,
+          "units": 0
+        },
+        "costMicros": 10
+      }
+    },
+    {
+      "name": "numbers JSON doesn't allow aren't read",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"c\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-6-luna-2026-09-22\",\"choices\":[],\"usage\":{\"prompt_tokens\":50,\"completion_tokens\":10}}\n\ndata: {\"id\":\"c\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-6-luna-2026-09-22\",\"choices\":[],\"usage\":{\"prompt_tokens\":1.,\"completion_tokens\":0x1p4}}\n\ndata: {\"id\":\"c\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-6-luna-2026-09-22\",\"choices\":[],\"usage\":{\"prompt_tokens\":nan,\"completion_tokens\":inf}}\n\ndata: {\"id\":\"c\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-6-luna-2026-09-22\",\"choices\":[],\"usage\":{\"prompt_tokens\":Infinity,\"completion_tokens\":+7}}\n\ndata: [DONE]\n\n"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "gpt-6-luna-2026-09-22",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 50,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 10,
+          "units": 0
+        },
+        "costMicros": 10
+      }
+    },
+    {
+      "name": "quota headers: the first value, plain digits only",
+      "service": "openai",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 429,
+        "headers": {
+          "Content-Type": "application/json",
+          "x-ratelimit-remaining-requests": "7, 9",
+          "x-ratelimit-remaining-tokens": "+5"
+        },
+        "body": "{\"error\":{\"message\":\"Rate limit reached\"}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "",
+        "outcome": "rate_limited",
+        "quota": {
+          "requestsLeft": 7
+        }
+      }
+    },
+    {
+      "name": "quota headers too large or negative aren't read",
+      "service": "openai",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 429,
+        "headers": {
+          "Content-Type": "application/json",
+          "x-ratelimit-remaining-requests": "-0",
+          "x-ratelimit-remaining-tokens": "9007199254740993"
+        },
+        "body": "{\"error\":{\"message\":\"Rate limit reached\"}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "",
+        "outcome": "rate_limited"
+      }
+    },
+    {
+      "name": "fetching a stored response isn't metered again",
+      "service": "openai",
+      "request": {
+        "method": "GET",
+        "path": "/v1/responses/resp_1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id\":\"resp_1\",\"object\":\"response\",\"status\":\"completed\",\"error\":null,\"model\":\"gpt-6-sol\",\"usage\":{\"input_tokens\":100000,\"output_tokens\":50000}}"
+      },
+      "expect": {
+        "operation": "",
+        "model": "",
+        "outcome": "ok"
+      }
+    },
+    {
+      "name": "openai responses: \"error\": null is a success",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/responses"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id\":\"resp_1\",\"object\":\"response\",\"status\":\"completed\",\"error\":null,\"model\":\"gpt-6-sol\",\"usage\":{\"input_tokens\":1000,\"output_tokens\":100}}"
+      },
+      "expect": {
+        "operation": "responses",
+        "model": "gpt-6-sol",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 1000,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 100,
+          "units": 0
+        },
+        "costMicros": 3000
+      }
+    },
+    {
+      "name": "anthropic stream that fails part way is an upstream error",
+      "service": "anthropic",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/messages"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-sonnet-5-5\",\"usage\":{\"input_tokens\":10,\"output_tokens\":1}}}\n\nevent: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}\n\n"
+      },
+      "expect": {
+        "operation": "messages",
+        "model": "claude-sonnet-5-5",
+        "outcome": "upstream_error",
+        "usage": {
+          "inputTokens": 10,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 1,
+          "units": 0
+        },
+        "costMicros": 30
+      }
+    },
+    {
+      "name": "openai responses stream failure event is an upstream error",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/responses"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"model\":\"gpt-6-sol\",\"error\":null}}\n\nevent: response.failed\ndata: {\"type\":\"response.failed\",\"response\":{\"model\":\"gpt-6-sol\",\"status\":\"failed\",\"error\":{\"code\":\"server_error\",\"message\":\"x\"}}}\n\n"
+      },
+      "expect": {
+        "operation": "responses",
+        "model": "gpt-6-sol",
+        "outcome": "upstream_error"
+      }
+    },
+    {
+      "name": "an error object in a chat stream is an upstream error",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"c\",\"model\":\"gpt-6-sol\",\"choices\":[{\"delta\":{\"content\":\"a\"}}]}\n\ndata: {\"error\":{\"message\":\"The server had an error\",\"type\":\"server_error\"}}\n\n"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "gpt-6-sol",
+        "outcome": "upstream_error"
+      }
+    },
+    {
+      "name": "an unlisted POST is metered with no operation",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/images/generations"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"created\":1,\"data\":[{\"b64_json\":\"AAAA\"}],\"usage\":{\"input_tokens\":50,\"output_tokens\":4000,\"total_tokens\":4050}}"
+      },
+      "expect": {
+        "operation": "",
+        "model": "",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 50,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 4000,
+          "units": 0
+        }
+      }
+    },
+    {
+      "name": "dot segments in a path are resolved before matching",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/x/../chat/./completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"model\":\"gpt-6-sol\",\"usage\":{\"prompt_tokens\":1000,\"completion_tokens\":100}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "gpt-6-sol",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 1000,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 100,
+          "units": 0
+        },
+        "costMicros": 3000
+      }
+    },
+    {
+      "name": "a POST below a listed operation repeats stored usage",
+      "service": "openai",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions/chatcmpl-1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion\",\"model\":\"gpt-6-sol\",\"metadata\":{\"k\":\"v\"},\"usage\":{\"prompt_tokens\":1000,\"completion_tokens\":100}}"
+      },
+      "expect": {
+        "operation": "",
+        "model": "",
+        "outcome": "ok"
+      }
+    },
+    {
+      "name": "openai responses compact is a billed operation",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/responses/compact"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id\":\"resp_c\",\"object\":\"response.compaction\",\"output\":[{\"type\":\"compaction\",\"encrypted_content\":\"x\"}],\"usage\":{\"input_tokens\":1000,\"output_tokens\":100,\"total_tokens\":1100}}"
+      },
+      "expect": {
+        "operation": "compact",
+        "model": "",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 1000,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 100,
+          "units": 0
+        }
+      }
+    },
+    {
+      "name": "a trailing slash isn't below an operation",
+      "service": "openai",
+      "time": "2026-10-15T12:00:00Z",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions/"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"model\":\"gpt-6-sol\",\"usage\":{\"prompt_tokens\":1000,\"completion_tokens\":100}}"
+      },
+      "expect": {
+        "operation": "",
+        "model": "gpt-6-sol",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 1000,
+          "cachedTokens": 0,
+          "cacheWriteTokens": 0,
+          "outputTokens": 100,
+          "units": 0
+        },
+        "costMicros": 3000
+      }
+    }
+  ]
+}

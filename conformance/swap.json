@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "bearer token in Authorization",
+      "service": "openai",
+      "request": {
+        "Authorization": "Bearer sk-stub-0a1b2c3d"
+      },
+      "realKey": "sk-real",
+      "token": "sk-stub-0a1b2c3d",
+      "upstream": {
+        "Authorization": "Bearer sk-real"
+      }
+    },
+    {
+      "name": "token in the service's own header",
+      "service": "anthropic",
+      "request": {
+        "X-Api-Key": "sk-stub-0a1b2c3d",
+        "Anthropic-Version": "2023-06-01"
+      },
+      "realKey": "sk-ant-real",
+      "token": "sk-stub-0a1b2c3d",
+      "upstream": {
+        "X-Api-Key": "sk-ant-real",
+        "Anthropic-Version": "2023-06-01"
+      }
+    },
+    {
+      "name": "token outside the auth headers is refused",
+      "service": "openai",
+      "request": {
+        "X-Custom-Auth": "key=sk-stub-0a1b2c3d"
+      },
+      "realKey": "sk-real",
+      "refused": true
+    },
+    {
+      "name": "token in a generic API-key header the service doesn't use is refused",
+      "service": "openai",
+      "request": {
+        "X-Api-Key": "sk-stub-0a1b2c3d"
+      },
+      "realKey": "sk-real",
+      "refused": true
+    },
+    {
+      "name": "token in a private-token header is refused",
+      "service": "stripe",
+      "request": {
+        "Authorization": "Bearer sk-stub-0a1b2c3d",
+        "Private-Token": "note sk-stub-0a1b2c3d end"
+      },
+      "realKey": "sk_live_real",
+      "refused": true
+    },
+    {
+      "name": "git sends the token as a Basic auth password",
+      "service": "github",
+      "request": {
+        "Authorization": "Basic eC1hY2Nlc3MtdG9rZW46c2stc3R1Yi0wYTFiMmMzZA=="
+      },
+      "realKey": "ghp_real",
+      "token": "sk-stub-0a1b2c3d",
+      "upstream": {
+        "Authorization": "Basic eC1hY2Nlc3MtdG9rZW46Z2hwX3JlYWw="
+      }
+    },
+    {
+      "name": "Stripe-style Basic auth with the token as the user name",
+      "service": "stripe",
+      "request": {
+        "Authorization": "Basic c2stc3R1Yi0wYTFiMmMzZDo="
+      },
+      "realKey": "rk_live_real",
+      "token": "sk-stub-0a1b2c3d",
+      "upstream": {
+        "Authorization": "Basic cmtfbGl2ZV9yZWFsOg=="
+      }
+    },
+    {
+      "name": "compact form without dashes",
+      "service": "vercel",
+      "request": {
+        "Authorization": "Bearer skstub0a1b2c3d"
+      },
+      "realKey": "vercel-real",
+      "token": "skstub0a1b2c3d",
+      "upstream": {
+        "Authorization": "Bearer vercel-real"
+      }
+    },
+    {
+      "name": "key with a prefix keeps its shape",
+      "service": "openai",
+      "request": {
+        "Authorization": "Convex prod:my-app|sk-stub-0a1b2c3d"
+      },
+      "realKey": "real-deploy-key",
+      "token": "sk-stub-0a1b2c3d",
+      "upstream": {
+        "Authorization": "Convex prod:my-app|real-deploy-key"
+      }
+    },
+    {
+      "name": "token in Authorization and the service's own header is swapped in both",
+      "service": "anthropic",
+      "request": {
+        "Authorization": "Bearer sk-stub-0a1b2c3d",
+        "X-Api-Key": "sk-stub-0a1b2c3d"
+      },
+      "realKey": "sk-ant-real",
+      "token": "sk-stub-0a1b2c3d",
+      "upstream": {
+        "Authorization": "Bearer sk-ant-real",
+        "X-Api-Key": "sk-ant-real"
+      }
+    },
+    {
+      "name": "token also in a header the service may store is refused",
+      "service": "stripe",
+      "request": {
+        "Authorization": "Bearer sk-stub-0a1b2c3d",
+        "Idempotency-Key": "sk-stub-0a1b2c3d"
+      },
+      "realKey": "sk_live_real",
+      "refused": true
+    },
+    {
+      "name": "no token anywhere: the catalog's auth header is written",
+      "service": "openai",
+      "request": {
+        "Content-Type": "application/json"
+      },
+      "realKey": "sk-real",
+      "token": "",
+      "upstream": {
+        "Authorization": "Bearer sk-real",
+        "Content-Type": "application/json"
+      }
+    },
+    {
+      "name": "no token anywhere: a non-Authorization auth header",
+      "service": "anthropic",
+      "request": {},
+      "realKey": "sk-ant-real",
+      "token": "",
+      "upstream": {
+        "X-Api-Key": "sk-ant-real"
+      }
+    },
+    {
+      "name": "no token anywhere: an existing key in the auth header is replaced",
+      "service": "openai",
+      "request": {
+        "Authorization": "Bearer sk-someone-elses-key"
+      },
+      "realKey": "sk-real",
+      "token": "",
+      "upstream": {
+        "Authorization": "Bearer sk-real"
+      }
+    },
+    {
+      "name": "uppercase hex isn't a token",
+      "service": "openai",
+      "request": {
+        "X-Note": "sk-stub-ZZZZ"
+      },
+      "realKey": "sk-real",
+      "token": "",
+      "upstream": {
+        "X-Note": "sk-stub-ZZZZ",
+        "Authorization": "Bearer sk-real"
+      }
+    },
+    {
+      "name": "the service's own header with an unusual name (GitLab)",
+      "service": "gitlab",
+      "request": {
+        "Private-Token": "sk-stub-0a1b2c3d"
+      },
+      "realKey": "glpat-real",
+      "token": "sk-stub-0a1b2c3d",
+      "upstream": {
+        "Private-Token": "glpat-real",
+        "Authorization": ""
+      }
+    },
+    {
+      "name": "Basic auth with a real user name and the token as password (Twilio)",
+      "service": "twilio",
+      "request": {
+        "Authorization": "Basic QUMwMTIzOnNrLXN0dWItMGExYjJjM2Q="
+      },
+      "realKey": "twilio-real",
+      "token": "sk-stub-0a1b2c3d",
+      "upstream": {
+        "Authorization": "Basic QUMwMTIzOnR3aWxpby1yZWFs"
+      }
+    },
+    {
+      "name": "no token anywhere: a raw key in Authorization (Linear)",
+      "service": "linear",
+      "request": {},
+      "realKey": "lin_api_real",
+      "token": "",
+      "upstream": {
+        "Authorization": "lin_api_real"
+      }
+    }
+  ],
+  "authHeaders": [
+    "Authorization"
+  ]
+}

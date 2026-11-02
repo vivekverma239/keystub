@@ -1,0 +1,66 @@
+{{define "content"}}
+<h1>Services in {{.Env.ID}}</h1>
+{{$env := .Env.ID}}
+{{if .Data.Links}}
+<table>
+  <tr><th>Service</th><th>Hosts</th><th>Key {{$env}} uses</th><th></th></tr>
+  {{range .Data.Links}}
+  {{$svc := .Service.ID}}{{$cur := .Link.KeyID}}
+  <tr>
+    <td><strong>{{.Service.Name}}</strong><div class="muted mono">{{join .Service.EnvVars ", "}}</div></td>
+    <td class="mono">{{join .Service.Hosts ", "}}</td>
+    <td>
+      {{if .Linked}}<span class="good">{{.Key.Name}}</span> <span class="muted">v{{.Key.Version}}, linked {{date .Link.SetAt}}</span>{{else}}<span class="bad">Not linked</span>{{end}}
+      {{if .Choices}}<form class="inline" method="post" action="/services/{{$svc}}/link">
+        <input type="hidden" name="env" value="{{$env}}">
+        <select name="key">{{range .Choices}}<option value="{{.ID}}" {{if eq .ID $cur}}selected{{end}}>{{.Name}}</option>{{end}}</select>
+        <button class="primary">{{if .Linked}}Switch{{else}}Link{{end}}</button>
+      </form>{{end}}
+      {{if .Linked}}<form class="inline" method="post" action="/services/{{$svc}}/unlink"><input type="hidden" name="env" value="{{$env}}"><button>Unlink</button></form>{{end}}
+      <details><summary>Paste a new key</summary>
+      <form method="post" action="/services/{{$svc}}/key" autocomplete="off">
+        <input type="hidden" name="env" value="{{$env}}">
+        <input name="name" placeholder="Name, e.g. team">
+        <input type="password" name="key" placeholder="Real key" required>
+        <button class="primary">Save and link</button>
+      </form></details>
+    </td>
+    <td><form class="inline" method="post" action="/services/{{$svc}}/remove"><input type="hidden" name="env" value="{{$env}}"><button class="danger">Remove</button></form></td>
+  </tr>
+  {{end}}
+</table>
+<p class="muted">Each environment links one saved key per service; several environments can share one. Rotate a key's value on the Keys page and every environment that links it uses the new value. Saved keys can't be viewed again; only the proxy reads them.</p>
+{{else}}
+<p class="muted">No services yet. Add one below, then link a saved key for each environment.</p>
+{{end}}
+
+{{if .Data.Presets}}
+<h2>Add a service</h2>
+{{range .Data.Presets}}
+<p class="muted">{{.Category}}</p>
+<div class="row">
+  {{range .Services}}
+  <form class="inline" method="post" action="/services/preset"><input type="hidden" name="env" value="{{$env}}"><input type="hidden" name="id" value="{{.ID}}"><button title="{{.Note}}">Add {{.Name}}</button></form>
+  {{end}}
+</div>
+{{end}}
+{{end}}
+
+<h2>Add another service</h2>
+<form method="post" action="/services/custom">
+  <input type="hidden" name="env" value="{{$env}}">
+  <div class="grid">
+    <label class="field">Name<input name="name" placeholder="Acme" required></label>
+    <label class="field">Hosts<input name="hosts" placeholder="api.acme.com, *.acme.dev" required></label>
+    <label class="field">Env vars<input name="envVars" placeholder="ACME_API_KEY, or NAME=prefix|{key}"></label>
+  </div>
+  <p class="muted">The proxy token is swapped for the real key in the Authorization header, so most services need only a name and hosts. If a service sends its key in another header, name it below.</p>
+  <details><summary>If the service doesn't use Authorization</summary>
+  <div class="grid">
+    <label class="field">Header<input name="header" placeholder="Authorization"></label>
+    <label class="field">Value<input name="format" placeholder="Bearer {key}"></label>
+  </div>
+  </details>
+  <p><button class="primary">Add service</button></p>
+</form>
+{{end}}

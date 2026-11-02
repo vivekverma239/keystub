@@ -1,0 +1,46 @@
+{{define "content"}}
+<h1>Projects</h1>
+{{range .Data}}
+<h2>{{.Name}} <span class="muted mono">{{.ID}}</span></h2>
+<table>
+  <tr><th>Level</th><th>Limits</th><th>Change limits</th></tr>
+  <tr>
+    <td><strong>Whole project</strong></td>
+    <td>{{limits .Limits}}</td>
+    <td><form class="inline" method="post" action="/projects/{{.ID}}/limits">
+      <input name="dailyRequests" size="9" placeholder="Per day" value="{{if .Limits.DailyRequests}}{{.Limits.DailyRequests}}{{end}}">
+      <input name="perMinute" size="9" placeholder="Per minute" value="{{if .Limits.PerMinute}}{{.Limits.PerMinute}}{{end}}">
+      <button>Save</button></form></td>
+  </tr>
+  {{range .Envs}}
+  <tr>
+    <td style="padding-left:34px"><a href="/tokens?env={{.ID}}">{{.ID}}</a></td>
+    <td>{{limits .Limits}}</td>
+    <td><form class="inline" method="post" action="/environments/limits"><input type="hidden" name="id" value="{{.ID}}">
+      <input name="dailyRequests" size="9" placeholder="Per day" value="{{if .Limits.DailyRequests}}{{.Limits.DailyRequests}}{{end}}">
+      <input name="perMinute" size="9" placeholder="Per minute" value="{{if .Limits.PerMinute}}{{.Limits.PerMinute}}{{end}}">
+      <button>Save</button></form>
+      <form class="inline" method="post" action="/environments/delete"><input type="hidden" name="id" value="{{.ID}}"><button class="danger">Delete</button></form></td>
+  </tr>
+  {{end}}
+</table>
+{{end}}
+<p class="muted">A request must fit every level's limit: its project, its environment, its token and the saved key it uses (set those on the Keys page).</p>
+
+<h2>Add an environment</h2>
+<form method="post" action="/environments" class="row" autocomplete="off">
+  <select name="project">{{range .Data}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select>
+  <input name="name" placeholder="prod, staging, preview-x" required>
+  <input name="dailyRequests" size="9" placeholder="Per day">
+  <input name="perMinute" size="9" placeholder="Per minute">
+  <button class="primary">Add environment</button>
+</form>
+
+<h2>Add a project</h2>
+<form method="post" action="/projects" class="row" autocomplete="off">
+  <input name="name" placeholder="My App" required>
+  <input name="dailyRequests" size="9" placeholder="Per day">
+  <input name="perMinute" size="9" placeholder="Per minute">
+  <button class="primary">Add project</button>
+</form>
+{{end}}

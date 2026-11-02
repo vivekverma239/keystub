@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{{if eq .Active "requests"}}<meta http-equiv="refresh" content="5">{{end}}
+<title>{{.Title}} · Keystub</title>
+<style>
+:root { --bg:#fbfaf7; --fg:#1d1c1a; --muted:#6b6860; --rule:#e4e1d9; --panel:#ffffff; --accent:#2f5bd3; --bad:#b3261e; --good:#1f7a3f; }
+@media (prefers-color-scheme: dark) { :root { --bg:#161614; --fg:#ecebe6; --muted:#a19e95; --rule:#34332f; --panel:#1f1e1b; --accent:#8aa8ff; --bad:#ff8a80; --good:#7bd88f; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+header { display:flex; gap:24px; align-items:center; padding:14px 24px; border-bottom:1px solid var(--rule); flex-wrap:wrap; }
+.envs { margin-left:auto; display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-size:13px; }
+.envs a { color:var(--muted); text-decoration:none; padding:3px 8px; border:1px solid var(--rule); border-radius:999px; }
+.envs a.on { color:var(--fg); border-color:var(--accent); }
+.tag { font-size:12px; color:var(--muted); border:1px solid var(--rule); border-radius:4px; padding:1px 6px; margin-right:4px; }
+.checks { display:flex; gap:10px; flex-wrap:wrap; font-size:13px; }
+select { font:inherit; padding:6px 9px; border:1px solid var(--rule); border-radius:6px; background:var(--bg); color:var(--fg); }
+header strong { font-size:16px; }
+nav a { color:var(--muted); text-decoration:none; margin-right:18px; }
+nav a.on { color:var(--fg); font-weight:600; }
+main { max-width:1040px; margin:0 auto; padding:24px; }
+h1 { font-size:22px; margin:8px 0 16px; }
+h2 { font-size:17px; margin:32px 0 12px; }
+table { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--rule); }
+th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--rule); vertical-align:middle; }
+th { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600; }
+tr:last-child td { border-bottom:0; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px; }
+.muted { color:var(--muted); }
+.bad { color:var(--bad); }
+.good { color:var(--good); }
+form.inline { display:inline-flex; gap:6px; align-items:center; margin:0; }
+input { font:inherit; padding:6px 9px; border:1px solid var(--rule); border-radius:6px; background:var(--bg); color:var(--fg); }
+button { font:inherit; padding:6px 12px; border-radius:6px; border:1px solid var(--rule); background:var(--panel); color:var(--fg); cursor:pointer; }
+button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+button.danger { color:var(--bad); }
+.grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:12px; }
+.field { display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--muted); }
+.notice { padding:12px 14px; border:1px solid var(--rule); border-left:3px solid var(--accent); background:var(--panel); margin-bottom:16px; }
+.error { border-left-color:var(--bad); }
+pre { background:var(--panel); border:1px solid var(--rule); padding:12px 14px; overflow-x:auto; }
+.row { display:flex; gap:8px; flex-wrap:wrap; }
+.bar-controls { align-items:center; justify-content:space-between; gap:16px; margin:8px 0; }
+.bar-controls .envs { margin-left:0; }
+.bars { display:flex; align-items:flex-end; gap:2px; height:80px; padding:8px; background:var(--panel); border:1px solid var(--rule); }
+.bar { flex:1; height:100%; display:flex; align-items:flex-end; }
+.bar span { display:block; width:100%; min-height:1px; background:var(--accent); border-radius:2px 2px 0 0; }
+td.num, th.num { text-align:right; }
+</style>
+</head>
+<body>
+<header>
+  <strong>Keystub</strong>
+  {{if ne .Active "login"}}<nav>
+    <a href="/services?env={{.Env.ID}}" {{if eq .Active "services"}}class="on"{{end}}>Services</a>
+    <a href="/keys?env={{.Env.ID}}" {{if eq .Active "keys"}}class="on"{{end}}>Keys</a>
+    <a href="/tokens?env={{.Env.ID}}" {{if eq .Active "tokens"}}class="on"{{end}}>Tokens</a>
+    <a href="/projects?env={{.Env.ID}}" {{if eq .Active "projects"}}class="on"{{end}}>Projects</a>
+    <a href="/machines?env={{.Env.ID}}" {{if eq .Active "machines"}}class="on"{{end}}>Machines</a>
+    <a href="/requests?env={{.Env.ID}}" {{if eq .Active "requests"}}class="on"{{end}}>Requests</a>
+    <a href="/usage?env={{.Env.ID}}" {{if eq .Active "usage"}}class="on"{{end}}>Usage</a>
+    <a href="/setup?env={{.Env.ID}}" {{if eq .Active "setup"}}class="on"{{end}}>Setup</a>
+  </nav>
+  {{if or (eq .Active "services") (eq .Active "tokens")}}<div class="envs">{{$cur := .Env.ID}}{{$page := .Active}}{{range .Envs}}<a href="/{{$page}}?env={{.ID}}" {{if eq .ID $cur}}class="on"{{end}}>{{.ID}}</a>{{end}}</div>{{end}}{{end}}
+</header>
+<main>
+{{if .Error}}<div class="notice error">{{.Error}}</div>{{end}}
+{{range .Notices}}<div class="notice">Converting older data: {{.}}</div>{{end}}
+{{template "content" .}}
+</main>
+</body>
+</html>

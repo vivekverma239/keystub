@@ -1,0 +1,20 @@
+{
+  "name": "keystub",
+  "version": "0.1.0",
+  "description": "Teaches your coding agent to move real API keys out of .env files, sandboxes and agents with Keystub, a proxy that swaps a stand-in token for the real key on the way out.",
+  "author": {
+    "name": "Keystub",
+    "url": "https://keystub.app"
+  },
+  "homepage": "https://keystub.app",
+  "repository": "https://github.com/vivekverma239/keystub",
+  "license": "Apache-2.0",
+  "keywords": [
+    "api-keys",
+    "secrets",
+    "dotenv",
+    "proxy",
+    "sandbox",
+    "credentials"
+  ]
+}
