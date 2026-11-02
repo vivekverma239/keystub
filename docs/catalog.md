@@ -50,7 +50,7 @@ Services whose auth doesn't fit one key in one header:
 
 ## Usage metadata
 
-`usage` tells every data plane how to meter a service's responses ([usage](usage.md)). The LLM services have it: OpenAI, Anthropic, Gemini, Groq, Mistral, OpenRouter, Vercel AI Gateway, DeepSeek, xAI, Together, Fireworks, Cohere and Perplexity.
+`usage` tells every data plane how to meter a service's responses ([usage](usage.md)). The LLM services have it: OpenAI, Anthropic, Gemini, Groq, Mistral, OpenRouter, Vercel AI Gateway, DeepSeek, Z.AI, xAI, Together, Fireworks, Cohere and Perplexity.
 
 | Field | What it does |
 | --- | --- |
