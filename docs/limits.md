@@ -16,6 +16,8 @@ A request goes ahead only if its project, its environment, its token and the sav
 | Token | Tokens page or `keystub tokens create`, when creating it | a CI job's token: 200 a day, 10 a minute |
 | Saved key | Keys page, or `keystub keys limits` | the `team` OpenAI key: 5,000 a day, whichever environments it's linked in |
 
+On hosted, project and environment limits are changed by a signed-in user (the dashboard or `keystub login`); an API key can set only saved key and token limits.
+
 Each level has a daily limit and a per-minute limit. Empty or 0 means no limit at that level. Negative numbers are refused.
 
 A saved key is counted only while it has a limit: one with none shows "Not counted" on the Keys page, and a limit added later counts from then. The other levels are always counted.
