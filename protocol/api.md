@@ -173,6 +173,7 @@ It also answers routes the CLI and `keystub run` use:
 GET    /api/me                         -> 200 {"server": "self-hosted", "account": {"id", "name"}, "apiKey": {"id", "envs": null}, "notices": [text]}
 GET    /api/projects                   -> 200 {"projects": [Project]}
 POST   /api/projects                   {"name", "limits"?} -> 201 {"project": Project}
+PATCH  /api/projects/{id}              {"limits": Limits | null} -> 200 {"ok": true}
 GET    /api/environments               -> 200 {"environments": [Environment]}
 POST   /api/environments               {"project", "name", "limits"?} -> 201 {"environment": Environment}
 PATCH  /api/environments/{env}         {"limits": Limits | null} -> 200 {"ok": true}
@@ -188,7 +189,7 @@ POST   /api/tokens/ensure              {"env", "name"} -> 200 {"id", "name", "en
 
 - **`/api/me` without a key** answers 401 in the error shape above. The CLI checks this before sending the admin key to the server `serve.json` names, since that file outlives the server.
 - **`notices`:** what converting older data changed, such as tokens it revoked. The dashboard and `keystub whoami` show them too.
-- **Environment limits:** `PATCH` needs `limits`. An object sets them, `null` clears them, and leaving it out is a 400.
+- **Project and environment limits:** `PATCH` needs `limits`. An object sets them, `null` clears them, and leaving it out is a 400. An object replaces both levels; the CLI's `projects limits` and `envs limits` keep a level you don't name by reading it first. On hosted, these need a signed-in user: an API key gets 403.
 - **Deleting an environment:** revokes its tokens, removes its links, and takes it off every linked machine. The saved keys stay. On hosted, a `remaining` above 0 means the edge hasn't heard all of it yet: `POST /api/environments/{env}/resync` until it is 0.
 - **Services:**
   - A service's hosts and header decide where its saved keys are sent, so they never change by accident.

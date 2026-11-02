@@ -23,12 +23,14 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/vivekverma239/keystub/docs"
 	"github.com/vivekverma239/keystub/internal/ca"
+	"github.com/vivekverma239/keystub/internal/cli"
 	"github.com/vivekverma239/keystub/internal/core"
 	"github.com/vivekverma239/keystub/internal/dashboard"
 	"github.com/vivekverma239/keystub/internal/limit"
@@ -64,7 +66,8 @@ Set Keystub up from the command line (hosted or self-hosted):
   keystub login | logout | whoami
   keystub services list | add | remove
   keystub keys list | add | scan | show | replace | rename | limits | delete
-  keystub envs list | add | delete | link | unlink | links
+  keystub projects list | limits
+  keystub envs list | add | limits | delete | link | unlink | links
   keystub tokens create | list | revoke
   keystub usage [PROJECT/ENV] [--by service,token,key] [--range 7d]
   keystub setup PROJECT/ENV
@@ -136,9 +139,11 @@ func main() {
 		}
 		fmt.Print(usageText)
 		return
-	case "login", "logout", "whoami", "keys", "envs", "tokens", "services", "usage", "setup", "ca":
-		cliMain(os.Args[1], os.Args[2:])
 	default:
+		if slices.Contains(cli.Commands, os.Args[1]) {
+			cliMain(os.Args[1], os.Args[2:])
+			return
+		}
 		fmt.Fprintf(os.Stderr, "keystub: unknown command %q\n\n%s", os.Args[1], usageText)
 		os.Exit(2)
 	}

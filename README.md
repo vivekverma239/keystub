@@ -90,6 +90,8 @@ keystub keys add openai --name team --from-env OPENAI_API_KEY --env-file .env
 keystub tokens create my-app/dev --name local --write-env .env --base-urls
 ```
 
+Limits are set per level, and a level you don't name keeps its value: `keystub projects limits my-app --daily 10000`, `keystub envs limits my-app/prod --per-minute 60`, `keystub keys limits team --daily 5000`, or `--clear`.
+
 Exit codes: 0 ok, 1 error, 2 usage, 3 not signed in, 4 not found, 5 conflict. The API it calls is in [protocol/api.md](protocol/api.md).
 
 ## The skill for coding agents

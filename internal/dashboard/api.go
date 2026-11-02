@@ -29,6 +29,7 @@ func (s *Server) routeAPI(m *http.ServeMux, a func(http.HandlerFunc) http.Handle
 	m.Handle("GET /api/me", a(s.apiMe))
 	m.Handle("GET /api/projects", a(s.apiProjects))
 	m.Handle("POST /api/projects", a(s.apiAddProject))
+	m.Handle("PATCH /api/projects/{id}", a(s.apiProjectLimits))
 	m.Handle("GET /api/environments", a(s.apiEnvironments))
 	m.Handle("POST /api/environments", a(s.apiAddEnvironment))
 	m.Handle("/api/environments/", a(s.apiEnvironment)) // {env} holds a slash; see envPath
@@ -199,6 +200,18 @@ func (s *Server) apiAddProject(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{"project": Project{ID: p.ID, Name: p.Name, Limits: apiLimits(p.Limits), CreatedAt: p.CreatedAt}})
 }
 
+func (s *Server) apiProjectLimits(w http.ResponseWriter, r *http.Request) {
+	l, ok := decodeLimits(w, r)
+	if !ok {
+		return
+	}
+	if err := s.Core.SetProjectLimits(r.Context(), r.PathValue("id"), l.core()); err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 func (s *Server) apiEnvironments(w http.ResponseWriter, r *http.Request) {
 	out := []Environment{}
 	for _, e := range s.Core.Environments() {
@@ -286,16 +299,26 @@ func (s *Server) apiEnvironment(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) apiEnvLimits(w http.ResponseWriter, r *http.Request, env core.Environment) {
+// decodeLimits reads {"limits": Limits | null}: null clears them, and
+// leaving limits out is a 400, so a typo can't clear them.
+func decodeLimits(w http.ResponseWriter, r *http.Request) (*Limits, bool) {
 	var in struct {
-		Limits json.RawMessage `json:"limits"` // null clears them; it can't be left out
+		Limits json.RawMessage `json:"limits"`
 	}
 	if !decode(w, r, &in) {
-		return
+		return nil, false
 	}
 	var l *Limits
 	if len(in.Limits) == 0 || json.Unmarshal(in.Limits, &l) != nil {
 		apiError(w, http.StatusBadRequest, `body must be {"limits": {"dailyRequests": n, "perMinute": n}}, or {"limits": null} to clear them`)
+		return nil, false
+	}
+	return l, true
+}
+
+func (s *Server) apiEnvLimits(w http.ResponseWriter, r *http.Request, env core.Environment) {
+	l, ok := decodeLimits(w, r)
+	if !ok {
 		return
 	}
 	if err := s.Core.SetEnvironmentLimits(r.Context(), env.ID, l.core()); err != nil {

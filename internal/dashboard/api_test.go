@@ -64,6 +64,7 @@ func TestAPIRoutes(t *testing.T) {
 		{"GET", "/api/me", "", 200, "account"},
 		{"GET", "/api/projects", "", 200, "projects"},
 		{"POST", "/api/projects", `{"name":"app"}`, 201, "project"},
+		{"PATCH", "/api/projects/app", `{"limits":{"dailyRequests":5,"perMinute":0}}`, 200, "ok"},
 		{"GET", "/api/environments", "", 200, "environments"},
 		{"POST", "/api/environments", `{"project":"app","name":"dev"}`, 201, "environment"},
 		{"PATCH", "/api/environments/app/dev", `{"limits":{"dailyRequests":5,"perMinute":0}}`, 200, "ok"},
@@ -142,11 +143,14 @@ func TestAPIErrors(t *testing.T) {
 		{"POST", "/api/keys", `[1]`, admin, 400, "object"},
 		{"POST", "/api/keys", `{"service":"openai","name":"x","value":"  "}`, admin, 400, "empty"},
 		{"PATCH", "/api/environments/default/dev", `{}`, admin, 400, "limits"},
+		{"PATCH", "/api/projects/default", `{}`, admin, 400, "limits"},
+		{"PATCH", "/api/projects/default", `{"limits":{"dailyRequests":-1}}`, admin, 400, ""},
 		{"PUT", "/api/environments/default/dev/links/openai", `{}`, admin, 400, "key"},
 		{"POST", "/api/environments/default/dev/tokens", `{"name":"x","ttl":"forever"}`, admin, 400, "lifetime"},
 		{"POST", "/api/environments/default/dev/tokens", `{"name":"a\nb"}`, admin, 400, "control"},
 		// 404s.
 		{"GET", "/api/keys/key_nope", "", admin, 404, "key_nope"},
+		{"PATCH", "/api/projects/nope", `{"limits":null}`, admin, 404, ""},
 		{"GET", "/api/environments/default/nope/links", "", admin, 404, "no environment"},
 		{"DELETE", "/api/environments/default/prod/links/openai", "", admin, 404, "isn't linked"},
 		{"GET", "/api/nope", "", admin, 404, "no such API route"},
@@ -190,6 +194,13 @@ func TestAPIErrors(t *testing.T) {
 	call(s, "PATCH", "/api/environments/default/dev", `{"limits":{"dailyRequests":5,"perMinute":1}}`)
 	if got := call(s, "PATCH", "/api/environments/default/dev", `{"limits":null}`); got.code != 200 {
 		t.Fatalf("clear env limits = %d %s", got.code, got.body)
+	}
+	call(s, "PATCH", "/api/projects/default", `{"limits":{"dailyRequests":5,"perMinute":1}}`)
+	if got := call(s, "PATCH", "/api/projects/default", `{"limits":null}`); got.code != 200 {
+		t.Fatalf("clear project limits = %d %s", got.code, got.body)
+	}
+	if got := call(s, "GET", "/api/projects", ""); !strings.Contains(got.body, `"limits":{"dailyRequests":0,"perMinute":0}`) {
+		t.Fatalf("projects after clear = %s", got.body)
 	}
 }
 

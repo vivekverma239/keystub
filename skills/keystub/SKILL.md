@@ -171,8 +171,11 @@ A proxy token works only on its way through Keystub. Pick one:
 - **List and revoke tokens** (ask first):
   `keystub tokens list my-app/dev --json`, then
   `keystub tokens revoke tk_123 --yes --json`.
-- **Limits:** `keystub keys limits team --service openai --daily 1000 --per-minute 60 --json`;
-  tokens take them too:
+- **Limits** (a level not named keeps its value; `--clear` removes both):
+  `keystub projects limits my-app --daily 10000 --json`,
+  `keystub envs limits my-app/prod --per-minute 60 --json`,
+  `keystub keys limits team --service openai --daily 1000 --per-minute 60 --json`;
+  tokens take them when made:
   `keystub tokens create my-app/ci --name ci --daily 500 --write-env .env.ci --json`.
 - **Usage:** `keystub usage my-app/dev --by service,key --range 7d --json`
   (`--by` also takes `token`, `model`, `operation`, `env` and `project`;

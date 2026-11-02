@@ -67,4 +67,10 @@ Later:
 - Stop a service in one environment:    keystub envs unlink my-app/dev openai
 - Revoke a token:                       keystub tokens revoke tk_… --yes
 - See usage:                            keystub usage my-app/dev --by service,key --range 7d
+- Limits (a level you don't name keeps its value; --clear removes both):
+    keystub projects limits my-app --daily 10000
+    keystub envs limits my-app/prod --per-minute 60
+    keystub keys limits team --service openai --daily 5000
+    keystub projects list            (envs list and keys list show limits too)
+  A token's limits are set when it's made: tokens create … --daily N --per-minute N
 - The CA for the remote proxy:          keystub ca -o keystub-ca.pem
