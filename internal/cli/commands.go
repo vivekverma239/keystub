@@ -73,6 +73,12 @@ func (t token) what() string {
 	return "an environment token for every service " + t.Env + " links"
 }
 
+type project struct {
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
+	Limits *limits `json:"limits"`
+}
+
 type environment struct {
 	ID     string  `json:"id"`
 	Limits *limits `json:"limits"`
@@ -121,6 +127,35 @@ func limitFlags(p parsed) (*limits, error) {
 		}
 	}
 	return &l, nil
+}
+
+// limitsChange reads a limits command's --daily, --per-minute and --clear:
+// the levels given, or nil for --clear.
+func limitsChange(p parsed) (*limits, error) {
+	l, err := limitFlags(p)
+	if err != nil {
+		return nil, err
+	}
+	if (l == nil) == !p.has("clear") {
+		return nil, usageErr("give --daily and/or --per-minute, or --clear")
+	}
+	return l, nil
+}
+
+// keepUnset fills the levels a limits command didn't name from the current
+// limits, so --daily alone leaves the per-minute limit as it was.
+func keepUnset(l, cur *limits, p parsed) *limits {
+	if l == nil || cur == nil {
+		return l
+	}
+	out := *l
+	if !p.has("daily") {
+		out.DailyRequests = cur.DailyRequests
+	}
+	if !p.has("per-minute") {
+		out.PerMinute = cur.PerMinute
+	}
+	return &out
 }
 
 // printNewToken prints a token just made: the value alone on stdout, so
@@ -304,20 +339,18 @@ func (c *ctx) keys(args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := p.want(1, 1, "keys limits KEY [--daily N] [--per-minute N] [--clear]"); err != nil {
+		if err := p.want(1, 1, "keys limits KEY [--daily N] [--per-minute N] [--clear] [--service S]"); err != nil {
 			return err
 		}
-		l, err := limitFlags(p)
+		l, err := limitsChange(p)
 		if err != nil {
 			return err
-		}
-		if (l == nil) == !p.has("clear") {
-			return usageErr("give --daily and/or --per-minute, or --clear")
 		}
 		k, err := c.findKey(p.args[0], p.flags["service"])
 		if err != nil {
 			return err
 		}
+		l = keepUnset(l, k.Limits, p)
 		var out struct {
 			Key savedKey `json:"key"`
 		}
@@ -403,6 +436,7 @@ func (c *ctx) findKey(ref, service string) (savedKey, error) {
 
 const envsUsage = `envs list
        keystub envs add PROJECT/ENV [--daily N] [--per-minute N]
+       keystub envs limits PROJECT/ENV [--daily N] [--per-minute N] [--clear]
        keystub envs delete PROJECT/ENV --yes
        keystub envs link PROJECT/ENV SERVICE KEY [--no-token] [--token-name NAME]
        keystub envs unlink PROJECT/ENV SERVICE
@@ -435,6 +469,45 @@ func (c *ctx) envs(args []string) error {
 			}
 			table(w, []string{"ENVIRONMENT", "LIMITS"}, rows)
 		})
+	case "limits":
+		p, err := parse(args, []string{"daily", "per-minute"}, []string{"clear"})
+		if err != nil {
+			return err
+		}
+		if err := p.want(1, 1, "envs limits PROJECT/ENV [--daily N] [--per-minute N] [--clear]"); err != nil {
+			return err
+		}
+		path, err := envPath(p.args[0])
+		if err != nil {
+			return err
+		}
+		l, err := limitsChange(p)
+		if err != nil {
+			return err
+		}
+		var es struct {
+			Environments []environment `json:"environments"`
+		}
+		if err := c.call("GET", "/api/environments", nil, &es); err != nil {
+			return err
+		}
+		var env *environment
+		for i := range es.Environments {
+			if es.Environments[i].ID == p.args[0] {
+				env = &es.Environments[i]
+			}
+		}
+		if env == nil {
+			return &Error{Code: ExitNotFound, Message: fmt.Sprintf("no environment %q", p.args[0])}
+		}
+		l = keepUnset(l, env.Limits, p)
+		if err := c.call("PATCH", path, map[string]any{"limits": l}, nil); err != nil {
+			return err
+		}
+		out := struct {
+			Environment environment `json:"environment"`
+		}{environment{ID: env.ID, Limits: zeroIfNil(l)}}
+		return c.emit(out, func(w io.Writer) { fmt.Fprintf(w, "Limits for %s: %s.\n", env.ID, l.String()) })
 	case "add":
 		p, err := parse(args, []string{"daily", "per-minute"}, nil)
 		if err != nil {
@@ -585,6 +658,84 @@ func (c *ctx) envs(args []string) error {
 		})
 	}
 	return usageErr("usage: keystub %s", envsUsage)
+}
+
+// --- projects ---
+
+const projectsUsage = `projects list
+       keystub projects limits PROJECT [--daily N] [--per-minute N] [--clear]`
+
+func (c *ctx) projects(args []string) error {
+	if len(args) == 0 {
+		return usageErr("usage: keystub %s", projectsUsage)
+	}
+	sub, args := args[0], args[1:]
+	var out struct {
+		Projects []project `json:"projects"`
+	}
+	switch sub {
+	case "list":
+		p, err := parse(args, nil, nil)
+		if err != nil {
+			return err
+		}
+		if err := p.want(0, 0, "projects list"); err != nil {
+			return err
+		}
+		if err := c.call("GET", "/api/projects", nil, &out); err != nil {
+			return err
+		}
+		return c.emit(out, func(w io.Writer) {
+			var rows [][]string
+			for _, x := range out.Projects {
+				rows = append(rows, []string{x.ID, x.Limits.String()})
+			}
+			table(w, []string{"PROJECT", "LIMITS"}, rows)
+		})
+	case "limits":
+		p, err := parse(args, []string{"daily", "per-minute"}, []string{"clear"})
+		if err != nil {
+			return err
+		}
+		if err := p.want(1, 1, "projects limits PROJECT [--daily N] [--per-minute N] [--clear]"); err != nil {
+			return err
+		}
+		l, err := limitsChange(p)
+		if err != nil {
+			return err
+		}
+		if err := c.call("GET", "/api/projects", nil, &out); err != nil {
+			return err
+		}
+		var pr *project
+		for i, x := range out.Projects {
+			if x.ID == p.args[0] || (pr == nil && strings.EqualFold(x.Name, p.args[0])) {
+				pr = &out.Projects[i]
+			}
+		}
+		if pr == nil {
+			return &Error{Code: ExitNotFound, Message: fmt.Sprintf("no project with ID or name %q (keystub projects list shows them)", p.args[0])}
+		}
+		l = keepUnset(l, pr.Limits, p)
+		if err := c.call("PATCH", "/api/projects/"+url.PathEscape(pr.ID), map[string]any{"limits": l}, nil); err != nil {
+			return err
+		}
+		pr.Limits = zeroIfNil(l)
+		res := struct {
+			Project project `json:"project"`
+		}{*pr}
+		return c.emit(res, func(w io.Writer) { fmt.Fprintf(w, "Limits for project %s: %s.\n", pr.ID, l.String()) })
+	}
+	return usageErr("usage: keystub %s", projectsUsage)
+}
+
+// zeroIfNil is the limits a level has after a change: nil (cleared) reads
+// as zero at both levels, as the API sends it.
+func zeroIfNil(l *limits) *limits {
+	if l == nil {
+		return &limits{}
+	}
+	return l
 }
 
 // --- tokens ---

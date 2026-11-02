@@ -692,3 +692,127 @@ func TestWhoamiShowsNotices(t *testing.T) {
 		t.Fatalf("whoami: %s", res.stdout)
 	}
 }
+
+func TestProjectAndEnvironmentLimits(t *testing.T) {
+	r := newRig(t)
+	r.must("", "services", "add", "echo", "--hosts", "api.echo.test")
+	r.must("real-one", "keys", "add", "echo", "--name", "team")
+	r.must("", "envs", "add", "shop/ci")
+	tok := strings.TrimSpace(r.must("", "envs", "link", "shop/ci", "echo", "team").stdout)
+	projectLimits := func() core.Limits {
+		for _, p := range r.engine.Projects() {
+			if p.ID == "shop" {
+				return p.Limits
+			}
+		}
+		t.Fatal("no project shop")
+		return core.Limits{}
+	}
+	envLimits := func() core.Limits {
+		e, _ := r.engine.Environment("shop/ci")
+		return e.Limits
+	}
+
+	// A level not named keeps its value.
+	got := r.must("", "projects", "limits", "shop", "--per-minute", "30", "--json").json(t)["project"].(map[string]any)
+	if got["limits"].(map[string]any)["perMinute"].(float64) != 30 {
+		t.Fatalf("projects limits JSON = %v", got)
+	}
+	r.must("", "projects", "limits", "shop", "--daily", "2")
+	if l := projectLimits(); l.DailyRequests != 2 || l.PerMinute != 30 {
+		t.Fatalf("project limits = %+v", l)
+	}
+	if list := r.must("", "projects", "list").stdout; !strings.Contains(list, "2/day, 30/min") {
+		t.Fatalf("projects list = %s", list)
+	}
+	for i, want := range []int{200, 200, 429} {
+		if st, _ := r.call("echo", tok); st != want {
+			t.Fatalf("call %d: %d, want %d", i+1, st, want)
+		}
+	}
+	r.must("", "projects", "limits", "shop", "--clear")
+	if l := projectLimits(); l != (core.Limits{}) {
+		t.Fatalf("cleared project limits = %+v", l)
+	}
+
+	r.must("", "envs", "limits", "shop/ci", "--daily", "100", "--per-minute", "10")
+	env := r.must("", "envs", "limits", "shop/ci", "--per-minute", "5", "--json").json(t)["environment"].(map[string]any)
+	if l := envLimits(); l.DailyRequests != 100 || l.PerMinute != 5 || env["limits"].(map[string]any)["dailyRequests"].(float64) != 100 {
+		t.Fatalf("env limits = %+v, JSON %v", l, env)
+	}
+	r.must("", "envs", "limits", "shop/ci", "--clear")
+	if l := envLimits(); l != (core.Limits{}) {
+		t.Fatalf("cleared env limits = %+v", l)
+	}
+
+	r.must("", "keys", "limits", "team", "--daily", "50", "--per-minute", "5")
+	k := r.must("", "keys", "limits", "team", "--daily", "60", "--json").json(t)["key"].(map[string]any)["limits"].(map[string]any)
+	if k["dailyRequests"].(float64) != 60 || k["perMinute"].(float64) != 5 {
+		t.Fatalf("key limits = %v", k)
+	}
+
+	for _, c := range []struct {
+		args []string
+		code int
+	}{
+		{[]string{"projects", "limits", "shop"}, ExitUsage},
+		{[]string{"projects", "limits", "shop", "--daily", "1", "--clear"}, ExitUsage},
+		{[]string{"projects", "limits", "shop", "--daily", "-1"}, ExitUsage},
+		{[]string{"projects", "limits", "nope", "--daily", "1"}, ExitNotFound},
+		{[]string{"envs", "limits", "shop/nope", "--daily", "1"}, ExitNotFound},
+		{[]string{"envs", "limits", "no-slash", "--daily", "1"}, ExitUsage},
+		{[]string{"projects", "nope"}, ExitUsage},
+	} {
+		if res := r.run("", c.args...); res.code != c.code {
+			t.Fatalf("%v: exit %d, want %d (%s)", c.args, res.code, c.code, res.stderr)
+		}
+	}
+}
+
+func TestLimitsKeepLevelsNotNamed(t *testing.T) {
+	// A level the command doesn't name keeps its value, including when the
+	// server sends no limits at all (null, as hosted does).
+	p := parsed{flags: map[string]string{"daily": "0"}, set: map[string]bool{"daily": true}}
+	if got := keepUnset(&limits{}, &limits{DailyRequests: 9, PerMinute: 5}, p); *got != (limits{0, 5}) {
+		t.Fatalf("--daily 0 = %+v", got)
+	}
+	if got := keepUnset(&limits{DailyRequests: 3}, nil, p); *got != (limits{3, 0}) {
+		t.Fatalf("no current limits = %+v", got)
+	}
+	if got := keepUnset(nil, &limits{DailyRequests: 9}, p); got != nil {
+		t.Fatalf("--clear = %+v", got)
+	}
+
+	r := newRig(t)
+	r.must("", "services", "add", "echo", "--hosts", "api.echo.test")
+	r.must("real-one", "keys", "add", "echo", "--name", "team", "--daily", "50", "--per-minute", "5")
+	r.must("", "keys", "limits", "team", "--daily", "0")
+	k := r.must("", "keys", "show", "team", "--json").json(t)["key"].(map[string]any)["limits"].(map[string]any)
+	if k["dailyRequests"].(float64) != 0 || k["perMinute"].(float64) != 5 {
+		t.Fatalf("after --daily 0: %v", k)
+	}
+	r.must("", "keys", "limits", "team", "--clear")
+	if k := r.must("", "keys", "show", "team", "--json").json(t)["key"].(map[string]any)["limits"]; k != nil {
+		if m := k.(map[string]any); m["dailyRequests"].(float64) != 0 || m["perMinute"].(float64) != 0 {
+			t.Fatalf("after --clear: %v", k)
+		}
+	}
+
+	// Projects by ID or name; list JSON shape; text output.
+	r.must("", "envs", "add", "shop/ci")
+	r.must("", "projects", "limits", "SHOP", "--daily", "7")
+	ps := r.must("", "projects", "list", "--json").json(t)["projects"].([]any)
+	found := false
+	for _, x := range ps {
+		m := x.(map[string]any)
+		if m["id"] == "shop" {
+			found = m["limits"].(map[string]any)["dailyRequests"].(float64) == 7
+		}
+	}
+	if !found {
+		t.Fatalf("projects list = %v", ps)
+	}
+	if out := r.must("", "envs", "limits", "shop/ci", "--per-minute", "3").stdout; out != "Limits for shop/ci: 3/min.\n" {
+		t.Fatalf("envs limits printed %q", out)
+	}
+}

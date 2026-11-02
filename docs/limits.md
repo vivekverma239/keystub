@@ -11,10 +11,12 @@ A request goes ahead only if its project, its environment, its token and the sav
 
 | Level | Set on | Example |
 | --- | --- | --- |
-| Project | Projects page | `my-app`: 10,000 requests a day across all its environments |
-| Environment | Projects page | `my-app/prod`: 60 requests a minute |
-| Token | Tokens page, when creating it | a CI job's token: 200 a day, 10 a minute |
+| Project | Projects page, or `keystub projects limits` | `my-app`: 10,000 requests a day across all its environments |
+| Environment | Projects page, or `keystub envs limits` | `my-app/prod`: 60 requests a minute |
+| Token | Tokens page or `keystub tokens create`, when creating it | a CI job's token: 200 a day, 10 a minute |
 | Saved key | Keys page, or `keystub keys limits` | the `team` OpenAI key: 5,000 a day, whichever environments it's linked in |
+
+On hosted, project and environment limits are changed by a signed-in user (the dashboard or `keystub login`); an API key can set only saved key and token limits.
 
 Each level has a daily limit and a per-minute limit. Empty or 0 means no limit at that level. Negative numbers are refused.
 
