@@ -2,10 +2,13 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -25,8 +28,37 @@ func cliMain(cmd string, args []string) {
 	os.Exit(cli.Main(cli.Env{
 		Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr,
 		Getenv: legacy.Getenv, Home: dir, Hostname: host,
-		StdinTerminal: isTerminal(os.Stdin), ReadSecret: readSecret,
+		StdinTerminal: isTerminal(os.Stdin), ReadSecret: readSecret, OpenURL: openURL,
 	}, cmd, args))
+}
+
+// openURL opens an http(s) page in the browser, unless this is a shell
+// over SSH or a Linux box with no display, where the browser would open
+// on the wrong machine or not at all.
+func openURL(u string) error {
+	if p, err := url.Parse(u); err != nil || (p.Scheme != "https" && p.Scheme != "http") {
+		return errors.New("not a web page")
+	}
+	if os.Getenv("SSH_CONNECTION") != "" || os.Getenv("SSH_TTY") != "" {
+		return errors.New("over SSH")
+	}
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", u)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", u)
+	default:
+		if os.Getenv("DISPLAY") == "" && os.Getenv("WAYLAND_DISPLAY") == "" {
+			return errors.New("no display")
+		}
+		cmd = exec.Command("xdg-open", u)
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() { _ = cmd.Wait() }()
+	return nil
 }
 
 func isTerminal(f *os.File) bool {

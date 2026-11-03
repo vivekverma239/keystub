@@ -778,6 +778,7 @@ func (c *ctx) tokens(args []string) error {
 			return usageErr("--base-urls goes with --write-env FILE")
 		}
 		var plan *tokenFile
+		var backup string
 		if p.has("write-env") {
 			// Everything the file needs is read, and the file checked,
 			// before the token is made, so a failure here leaves no token
@@ -786,6 +787,12 @@ func (c *ctx) tokens(args []string) error {
 				return err
 			}
 			if plan, err = c.planTokenFile(path, p.flags["service"], p.has("base-urls")); err != nil {
+				return err
+			}
+			if err := c.confirmWrite(file, *plan); err != nil {
+				return err
+			}
+			if backup, err = c.backupDotenv(file); err != nil {
 				return err
 			}
 		}
@@ -806,7 +813,7 @@ func (c *ctx) tokens(args []string) error {
 			return err
 		}
 		if plan != nil {
-			return c.writeToken(file, *plan, out.Token)
+			return c.writeToken(file, *plan, out.Token, backup)
 		}
 		return c.emit(out.Token, func(io.Writer) { c.printNewToken(out.Token) })
 	case "list":

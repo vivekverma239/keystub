@@ -18,8 +18,17 @@ Saved keys ◄── link per service ── Environment ── Project
 - Each request is logged with its project, environment, token and saved key, and for LLM services its model, tokens, cost and outcome, read from the response as it streams; hourly metrics export as CSV, JSON and Prometheus ([usage](docs/usage.md)).
 
 ```bash
-go install github.com/vivekverma239/keystub/cmd/keystub@latest   # or, in a clone: go build -o "$(go env GOPATH)/bin/keystub" ./cmd/keystub
+curl -fsSL https://raw.githubusercontent.com/vivekverma239/keystub/main/install.sh | sh
+# or: go install github.com/vivekverma239/keystub/cmd/keystub@latest
 keystub serve                  # prints the dashboard link with its admin token
+```
+
+With a coding agent, ask it to set Keystub up for the project: the [skill](#the-skill-for-coding-agents) has it run `keystub init --dry-run`, show you the plan, and change nothing until you agree. By hand, in a folder with a `.env`:
+
+```bash
+keystub init --dry-run     # what it would do; then keystub init to do it
+keystub init --write-env   # also a token in .env in place of the real keys (asks; keeps a copy in ~/.keystub/backups)
+keystub doctor             # checks the setup and the token
 ```
 
 Open the printed link, add a service (OpenAI, Anthropic, GitHub, Stripe, Resend, Cloudflare, Vercel, or any name and hosts), and paste its real key (it's saved and linked into `default/dev`). Then:

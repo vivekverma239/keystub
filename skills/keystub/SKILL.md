@@ -16,8 +16,18 @@ on the way out, only for that service's hosts.
 
 Do every step with the `keystub` CLI. Don't call Keystub's HTTP API
 yourself, and don't edit `.env` files by hand to move keys or tokens: the
-commands below read and write them. If `keystub` isn't on the PATH, ask
-the user to install it; don't download anything yourself.
+commands below read and write them.
+
+If `keystub` isn't on the PATH (`keystub version` fails), ask the user
+whether to install it, and on their yes run the installer, which checks
+the download against the release's checksums:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vivekverma239/keystub/main/install.sh | sh
+```
+
+It installs to `~/.local/bin`; if that isn't on the PATH yet, call
+`~/.local/bin/keystub` until the user opens a new terminal.
 
 ## Rules
 
@@ -34,6 +44,9 @@ Follow these every time.
 3. **Never see a token either.** Make tokens with `--write-env FILE`, which
    writes the token into the file and doesn't print it. A token printed
    any other way is shown once: don't repeat it in chat, commits or files.
+   Writing a `.env` file replaces the real keys in it, so **ask the user
+   first**, every time; then pass `--yes`. The CLI copies the old file to
+   `~/.keystub/backups` before it writes, and says where.
 4. **Ask the user first** before deleting or revoking anything, and before
    unlinking a service. Deletes and revokes then need `--yes`: nothing
    prompts when stdin isn't a terminal, so without it they fail with exit
@@ -49,9 +62,11 @@ a key that is still linked).
 Check first: `keystub whoami --json`. Exit code 3 means not signed in:
 
 - **Hosted, a person at the keyboard:** run `keystub login --json` in the
-  background: it waits until the code is approved or expires. It prints a
-  URL and a code on stderr; tell the user both, and they approve it in the
-  browser. When it exits 0, check again with `keystub whoami --json`.
+  background (add `--server URL` when the user names a server): it opens
+  the approval page in the browser and waits until the code is approved
+  or expires. It prints the URL and the code on stderr; tell the user
+  both, in case the browser didn't open. When it exits 0, check again with
+  `keystub whoami --json`.
 - **CI, sandboxes and agents with no browser:** the user sets
   `KEYSTUB_API_KEY` (an API key from the dashboard) and `KEYSTUB_SERVER`
   (its server, e.g. `https://app.keystub.app`) in the environment. The CLI
@@ -62,6 +77,26 @@ Check first: `keystub whoami --json`. Exit code 3 means not signed in:
 `keystub logout --json` signs out.
 
 ## Set a project up
+
+**The short way**, for a folder with a `.env` file. `init` reads `.env`
+in this folder and uses the environment `<folder>/dev`; name others with
+`--env-file FILE` and `PROJECT/ENV` (e.g. `keystub init my-app/dev --env-file .env.local`).
+
+1. Show the plan, which changes nothing:
+   `keystub init --dry-run --json`. Tell the user, in a few lines, which
+   services and variables it moves, the environment, and the key name
+   (`personal`; `--key-name team` for another), and what it leaves alone.
+2. On their yes: `keystub init --yes --json`. It adds the services, saves
+   each key straight from the file, makes the environment and links the
+   keys. The `.env` file isn't changed.
+3. Ask whether to put a token in `.env` in place of the real keys. Only
+   on a yes: `keystub init --write-env --yes --json`. It answers with the
+   copy of the old file (`backup`); tell the user where it is.
+4. Check it: `keystub doctor --json`. Each check is `ok`, `warn` or
+   `fail`, with what to do in `detail`; exit code 1 means one failed.
+
+The steps below do the same one at a time, for anything `init` leaves
+alone (a key inside a template, a service the catalog doesn't have).
 
 1. **Find the keys.** Look for `.env`, `.env.local`, `.env.development`,
    `.dev.vars` and similar, then scan each:
@@ -116,21 +151,23 @@ Check first: `keystub whoami --json`. Exit code 3 means not signed in:
    keystub envs links my-app/dev --json
    ```
 
-7. **Make a token and write it where the real keys were.** `--write-env`
-   sets every key variable of the services the token covers (the real
-   keys' lines become the token; missing ones are added) and prints the
-   token's ID, never the token. `--base-urls` also points each SDK that
-   takes a base URL at Keystub's edge (next section).
+7. **Make a token and write it where the real keys were**, if the user
+   agrees (rule 3). `--write-env` sets every key variable of the services
+   the token covers (the real keys' lines become the token; missing ones
+   are added), copies the old file to `~/.keystub/backups` first, and
+   prints the token's ID, never the token. `--base-urls` also points each
+   SDK that takes a base URL at Keystub's edge (next section).
 
    ```bash
-   keystub tokens create my-app/dev --name local-dev --write-env .env --base-urls --json
+   keystub tokens create my-app/dev --name local-dev --write-env .env --base-urls --yes --json
    ```
 
    Add `--ttl 2h` for a token that expires, `--service openai` for one
    service only. Give each sandbox, CI job or worktree its own token.
 
 8. **Send requests through Keystub** (next section), run the app or its
-   tests, and check the requests arrived:
+   tests, and check with `keystub doctor my-app/dev --json` and that the
+   requests arrived:
    `keystub usage my-app/dev --range 24h --json`. Then
    `keystub keys scan .env --json` should show `proxyToken: true` for each
    moved variable.
@@ -176,7 +213,7 @@ A proxy token works only on its way through Keystub. Pick one:
   `keystub envs limits my-app/prod --per-minute 60 --json`,
   `keystub keys limits team --service openai --daily 1000 --per-minute 60 --json`;
   tokens take them when made:
-  `keystub tokens create my-app/ci --name ci --daily 500 --write-env .env.ci --json`.
+  `keystub tokens create my-app/ci --name ci --daily 500 --write-env .env.ci --yes --json`.
   On hosted, project and environment limits need `keystub login`: with
   `KEYSTUB_API_KEY` they get 403 (exit 1), so ask the user to sign in or set
   them on the dashboard.
