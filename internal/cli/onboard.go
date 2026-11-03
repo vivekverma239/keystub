@@ -214,13 +214,16 @@ func (c *ctx) initEnv(args []string) error {
 	for _, st := range plan.Steps {
 		plan.Changes = plan.Changes || st.AddService || st.SaveKey || st.Link
 	}
-	if plan.WriteEnv {
+	if plan.WriteEnv && len(plan.Steps) > 0 {
 		// What the token file will set: the key variables of every service
 		// the environment links once this is done, and with --base-urls
-		// their base URLs.
+		// their base URLs, as the account's own copy of each service has
+		// them (the catalog's only for a service being added).
 		byID := map[string]service{}
 		for _, r := range reads {
-			byID[r.service.ID] = r.service
+			if _, ok := byID[r.service.ID]; !ok || r.added {
+				byID[r.service.ID] = r.service
+			}
 		}
 		covered := map[string]bool{}
 		for _, st := range plan.Steps {
@@ -244,6 +247,13 @@ func (c *ctx) initEnv(args []string) error {
 	}
 	plan.Changes = plan.Changes || plan.MakeEnv || (plan.WriteEnv && len(plan.Steps) > 0)
 	if len(plan.Steps) == 0 && len(linked) == 0 {
+		if len(plan.Skipped) > 0 {
+			var why []string
+			for _, sk := range plan.Skipped {
+				why = append(why, sk.Var+": "+sk.Reason)
+			}
+			return &Error{Code: ExitError, Message: fmt.Sprintf("%s has no key init can save: %s", file, strings.Join(why, "; ")), Extra: map[string]any{"skipped": plan.Skipped}}
+		}
 		return &Error{Code: ExitNotFound, Message: fmt.Sprintf("%s sets no key Keystub knows: see keystub keys scan %s, or add a service with keystub services add", file, file)}
 	}
 
@@ -365,9 +375,9 @@ func (c *ctx) initWrite(plan *initPlan, path string) error {
 
 func (c *ctx) initNext(plan initPlan) []string {
 	var next []string
-	base := fmt.Sprintf("keystub init %s --env-file %s", plan.Env, plan.File)
+	base := "keystub init " + shellQuote(plan.Env) + " --env-file " + shellQuote(plan.File)
 	if !strings.EqualFold(plan.KeyName, "personal") {
-		base += " --key-name " + plan.KeyName
+		base += " --key-name " + shellQuote(plan.KeyName)
 	}
 	if plan.DryRun && plan.Changes {
 		flags := ""
@@ -383,7 +393,7 @@ func (c *ctx) initNext(plan initPlan) []string {
 	if plan.FileSet == nil && len(plan.Steps) > 0 {
 		next = append(next, fmt.Sprintf("%s --write-env --base-urls --dry-run   (shows which variables a token would replace in %s; only with the person's yes, run it again with --yes in place of --dry-run, which copies the file to %s first)", base, plan.File, c.backupDir()))
 	}
-	next = append(next, fmt.Sprintf("keystub doctor %s --env-file %s", plan.Env, plan.File))
+	next = append(next, "keystub doctor "+shellQuote(plan.Env)+" --env-file "+shellQuote(plan.File))
 	return next
 }
 
@@ -412,7 +422,7 @@ func (c *ctx) printPlan(w io.Writer, plan initPlan) {
 	for _, s := range plan.Skipped {
 		fmt.Fprintf(w, "  - %s left alone: %s\n", s.Var, s.Reason)
 	}
-	if plan.WriteEnv {
+	if plan.WriteEnv && len(plan.Steps) > 0 {
 		fmt.Fprintf(w, "  - put a new token in %s, setting %s (the file is copied to %s first)\n", plan.File, strings.Join(plan.WriteVars, ", "), c.backupDir())
 	} else {
 		fmt.Fprintf(w, "  - %s isn't changed\n", plan.File)
@@ -425,6 +435,16 @@ func (c *ctx) printPlan(w io.Writer, plan initPlan) {
 			fmt.Fprintln(w, "Next:", s)
 		}
 	}
+}
+
+var shellSafe = regexp.MustCompile(`^[A-Za-z0-9_./:@%+=,-]+$`)
+
+// shellQuote quotes a word for a suggested command line, when it needs it.
+func shellQuote(v string) string {
+	if shellSafe.MatchString(v) {
+		return v
+	}
+	return "'" + strings.ReplaceAll(v, "'", `'\''`) + "'"
 }
 
 // --- doctor ---

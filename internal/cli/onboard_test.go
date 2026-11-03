@@ -124,9 +124,13 @@ func TestInit(t *testing.T) {
 		t.Fatalf("doctor after: %s", res.stdout)
 	}
 
-	// Once the file holds tokens, init has nothing more to suggest writing.
+	// Once the file holds tokens, init has nothing more to suggest writing,
+	// and a --write-env plan has nothing to write.
 	if again := r.must("", "init", "--env-file", path, "--json"); strings.Contains(again.stdout, "--write-env") {
 		t.Errorf("suggests --write-env again: %s", again.stdout)
+	}
+	if again := r.must("", "init", "--env-file", path, "--write-env", "--dry-run", "--json").json(t); again["writeVars"] != nil || again["changes"] != false {
+		t.Errorf("--write-env plan after: %v", again)
 	}
 
 	// A token for a service the environment doesn't link fails, as one
@@ -179,11 +183,24 @@ func TestInitRefusals(t *testing.T) {
 		t.Error("a missing file")
 	}
 	path = writeDotenv(t, "app", "OPENAI_API_KEY=sk-stub-abc\n")
-	if res := r.run("", "init", "--env-file", path, "--json"); res.code != ExitNotFound || !strings.Contains(res.stdout, "keys scan") {
+	if res := r.run("", "init", "--env-file", path, "--json"); res.code != ExitError || !strings.Contains(res.stdout, "already a Keystub token") {
 		t.Errorf("only a token: %d %s", res.code, res.stdout)
 	}
 	if res := r.run("", "doctor", "--env-file", path, "--json"); res.code != ExitError || !strings.Contains(res.stdout, "keystub init") {
 		t.Errorf("doctor, no environment: %d %s", res.code, res.stdout)
+	}
+}
+
+func TestInitExplainsSkippedKeys(t *testing.T) {
+	r := newRig(t)
+	path := writeDotenv(t, "app", "OPENAI_API_KEY=sk-a$b\n")
+	res := r.run("", "init", "--env-file", path, "--dry-run", "--json")
+	if res.code != ExitError || !strings.Contains(res.stdout, "OPENAI_API_KEY") || !strings.Contains(res.stdout, "skipped") || strings.Contains(res.stdout, "sk-a") {
+		t.Fatalf("all skipped: %d %s", res.code, res.stdout)
+	}
+	// A suggested command quotes what needs it.
+	if got := shellQuote("/x/My App/.env"); got != `'/x/My App/.env'` {
+		t.Errorf("shellQuote = %s", got)
 	}
 }
 
