@@ -84,8 +84,17 @@ func TestInit(t *testing.T) {
 		t.Fatalf("doctor: %s", res.stdout)
 	}
 
+	// The --write-env plan names every variable it would set.
+	plan = r.must("", "init", "--env-file", path, "--write-env", "--base-urls", "--dry-run", "--json").json(t)
+	if got := strings.Join(toStrings(plan["writeVars"]), ","); got != "ANTHROPIC_BASE_URL,ANTHROPIC_API_KEY,OPENAI_BASE_URL,OPENAI_API_KEY" {
+		t.Errorf("writeVars %s", got)
+	}
+	if res := r.run("", "init", "--env-file", path, "--base-urls", "--json"); res.code != ExitUsage {
+		t.Errorf("--base-urls alone: %d", res.code)
+	}
+
 	// With --write-env: a token in the file, after a copy is kept.
-	res = r.must("", "init", "--env-file", path, "--write-env", "--yes", "--json")
+	res = r.must("", "init", "--env-file", path, "--write-env", "--base-urls", "--yes", "--json")
 	if strings.Contains(res.stdout+res.stderr, core.TokenPrefix) {
 		t.Fatal("init printed the token")
 	}
@@ -115,10 +124,48 @@ func TestInit(t *testing.T) {
 		t.Fatalf("doctor after: %s", res.stdout)
 	}
 
-	// A token for a service the environment doesn't link fails.
+	// Once the file holds tokens, init has nothing more to suggest writing.
+	if again := r.must("", "init", "--env-file", path, "--json"); strings.Contains(again.stdout, "--write-env") {
+		t.Errorf("suggests --write-env again: %s", again.stdout)
+	}
+
+	// A token for a service the environment doesn't link fails, as one
+	// JSON value on stdout.
 	r.must("", "envs", "unlink", "my-app/dev", "anthropic")
-	if res := r.run("", "doctor", "--env-file", path, "--json"); res.code != ExitError || !strings.Contains(res.stdout, "doesn't link anthropic") {
+	res = r.run("", "doctor", "--env-file", path, "--json")
+	if res.code != ExitError || !strings.Contains(res.stdout, "doesn't link anthropic") {
 		t.Fatalf("doctor, unlinked: %d %s", res.code, res.stdout)
+	}
+	if e, _ := res.json(t)["error"].(map[string]any); e == nil || e["checks"] == nil {
+		t.Errorf("doctor's failure: %s", res.stdout)
+	}
+	if res := r.run("", "doctor", "my-app/dev", "--env-file", path+".missing", "--json"); res.code != ExitError {
+		t.Errorf("doctor, no file: %d %s", res.code, res.stdout)
+	}
+}
+
+func toStrings(v any) []string {
+	var out []string
+	for _, x := range v.([]any) {
+		out = append(out, x.(string))
+	}
+	return out
+}
+
+func TestInitLeavesUnclearValues(t *testing.T) {
+	r := newRig(t)
+	path := writeDotenv(t, "app", "OPENAI_API_KEY=sk-real\nANTHROPIC_API_KEY=sk-ant$x\n")
+	res := r.must("", "init", "--env-file", path, "--key-name", "work", "--yes", "--json")
+	out := res.json(t)
+	if len(out["steps"].([]any)) != 1 || len(out["skipped"].([]any)) != 1 || strings.Contains(res.stdout, "sk-ant") {
+		t.Fatalf("init: %s", res.stdout)
+	}
+	if got, _ := r.engine.RealKey(context.Background(), "app/dev", "openai"); got != "sk-real" {
+		t.Errorf("openai: %q", got)
+	}
+	// The next steps keep the key name.
+	if !strings.Contains(res.stdout, "--key-name work") {
+		t.Errorf("next steps: %s", res.stdout)
 	}
 }
 
@@ -137,6 +184,21 @@ func TestInitRefusals(t *testing.T) {
 	}
 	if res := r.run("", "doctor", "--env-file", path, "--json"); res.code != ExitError || !strings.Contains(res.stdout, "keystub init") {
 		t.Errorf("doctor, no environment: %d %s", res.code, res.stdout)
+	}
+}
+
+func TestBackupOfALongPath(t *testing.T) {
+	r := newRig(t)
+	dir := filepath.Join(t.TempDir(), strings.Repeat("a", 120), strings.Repeat("b", 120))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, ".env")
+	_ = os.WriteFile(path, []byte("X=1\n"), 0o600)
+	c := &ctx{Env: Env{Home: r.home}}
+	b, err := c.backupDotenv(path)
+	if err != nil || len(filepath.Base(b)) > 120 {
+		t.Fatalf("backup %q: %v", b, err)
 	}
 }
 

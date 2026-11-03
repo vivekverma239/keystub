@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -281,7 +283,14 @@ func (c *ctx) backupDotenv(path string) (string, error) {
 	if err := os.MkdirAll(c.backupDir(), 0o700); err != nil {
 		return "", err
 	}
-	name := time.Now().Format("20060102-150405") + "-" + strings.Trim(backupUnsafe.ReplaceAllString(abs, "_"), "_")
+	// The time, the folder and file names (cut short), and a hash of the
+	// full path, so two projects' .env files never share a name.
+	sum := sha256.Sum256([]byte(abs))
+	label := strings.Trim(backupUnsafe.ReplaceAllString(filepath.Base(filepath.Dir(abs))+"-"+filepath.Base(abs), "_"), "_")
+	if len(label) > 80 {
+		label = label[:80]
+	}
+	name := time.Now().Format("20060102-150405") + "-" + label + "-" + hex.EncodeToString(sum[:4])
 	for i := 1; ; i++ {
 		dst := filepath.Join(c.backupDir(), name)
 		if i > 1 {

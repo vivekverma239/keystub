@@ -24,9 +24,11 @@ The short way, for a project with a .env file:
    keystub login --server https://app.keystub.app   (opens the browser; approve the code)
    keystub init --dry-run --json      (the plan: services, keys, the environment; changes nothing)
    keystub init --yes --json          (after the person agrees: saves the keys from .env, links them)
-   keystub init --write-env --yes --json
+   keystub init --write-env --base-urls --dry-run --json
+                                      (the variables a token would replace in .env; "writeVars")
+   keystub init --write-env --base-urls --yes --json
                                       (only if the person agrees: a token in .env in place of
-                                       the real keys, and base URLs on the edge)
+                                       the real keys, and each SDK's base URL on the edge)
    keystub doctor --json              (checks sign-in, links, the .env file, and the token)
    init and doctor read .env in this folder and use the environment
    <folder>/dev; name others with --env-file FILE and PROJECT/ENV. init saves

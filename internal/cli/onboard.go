@@ -35,6 +35,8 @@ type initPlan struct {
 	Steps     []initStep `json:"steps"`
 	Skipped   []skipped  `json:"skipped"`
 	WriteEnv  bool       `json:"writeEnv"`
+	BaseURLs  bool       `json:"baseUrls"`
+	WriteVars []string   `json:"writeVars,omitempty"` // what --write-env sets in the file
 	Changes   bool       `json:"changes"`
 	DryRun    bool       `json:"dryRun"`
 	Backup    string     `json:"backup,omitempty"`
@@ -49,7 +51,7 @@ type skipped struct {
 	Reason string `json:"reason"`
 }
 
-const initUsage = "init [PROJECT/ENV] [--env-file FILE] [--key-name NAME] [--write-env] [--dry-run]"
+const initUsage = "init [PROJECT/ENV] [--env-file FILE] [--key-name NAME] [--write-env [--base-urls]] [--dry-run]"
 
 var slugUnsafe = regexp.MustCompile(`[^a-z0-9]+`)
 
@@ -102,7 +104,7 @@ func (c *ctx) readers() (map[string]reader, error) {
 }
 
 func (c *ctx) initEnv(args []string) error {
-	p, err := parse(args, []string{"env-file", "key-name"}, []string{"write-env", "dry-run"})
+	p, err := parse(args, []string{"env-file", "key-name"}, []string{"write-env", "base-urls", "dry-run"})
 	if err != nil {
 		return err
 	}
@@ -113,7 +115,10 @@ func (c *ctx) initEnv(args []string) error {
 	if file == "" {
 		file = ".env"
 	}
-	plan := initPlan{File: file, KeyName: p.flags["key-name"], WriteEnv: p.has("write-env"), DryRun: p.has("dry-run"), Steps: []initStep{}, Skipped: []skipped{}}
+	plan := initPlan{File: file, KeyName: p.flags["key-name"], WriteEnv: p.has("write-env"), BaseURLs: p.has("base-urls"), DryRun: p.has("dry-run"), Steps: []initStep{}, Skipped: []skipped{}}
+	if plan.BaseURLs && !plan.WriteEnv {
+		return usageErr("--base-urls goes with --write-env")
+	}
 	if plan.KeyName == "" {
 		plan.KeyName = "personal"
 	}
@@ -188,6 +193,12 @@ func (c *ctx) initEnv(args []string) error {
 			plan.Skipped = append(plan.Skipped, skipped{n, "another variable already gives the " + r.service.ID + " key"})
 			continue
 		}
+		// A value dotenv loaders read differently from the file (a stray #
+		// or $, odd quotes) isn't saved: the person fixes the line first.
+		if _, err := dotenvValue(file, n); err != nil {
+			plan.Skipped = append(plan.Skipped, skipped{n, err.Error()})
+			continue
+		}
 		seen[r.service.ID] = true
 		st := initStep{Service: r.service.ID, Var: n, AddService: !r.added, SaveKey: true, Link: true}
 		for _, k := range keys {
@@ -202,6 +213,34 @@ func (c *ctx) initEnv(args []string) error {
 	}
 	for _, st := range plan.Steps {
 		plan.Changes = plan.Changes || st.AddService || st.SaveKey || st.Link
+	}
+	if plan.WriteEnv {
+		// What the token file will set: the key variables of every service
+		// the environment links once this is done, and with --base-urls
+		// their base URLs.
+		byID := map[string]service{}
+		for _, r := range reads {
+			byID[r.service.ID] = r.service
+		}
+		covered := map[string]bool{}
+		for _, st := range plan.Steps {
+			covered[st.Service] = true
+		}
+		for id := range linked {
+			covered[id] = true
+		}
+		var ids []string
+		for id := range covered {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		for _, id := range ids {
+			s := byID[id]
+			if plan.BaseURLs && s.BaseURL != nil && s.BaseURL.Var != "" {
+				plan.WriteVars = append(plan.WriteVars, s.BaseURL.Var)
+			}
+			plan.WriteVars = append(plan.WriteVars, s.varNames()...)
+		}
 	}
 	plan.Changes = plan.Changes || plan.MakeEnv || (plan.WriteEnv && len(plan.Steps) > 0)
 	if len(plan.Steps) == 0 && len(linked) == 0 {
@@ -295,16 +334,10 @@ func (c *ctx) makeEnv(env string) error {
 }
 
 // initWrite makes an environment token and puts it in the dotenv file,
-// with base URLs on the edge where the server has one, after keeping a
-// copy of the file.
+// with base URLs on the edge with --base-urls, after keeping a copy of
+// the file.
 func (c *ctx) initWrite(plan *initPlan, path string) error {
-	var setup struct {
-		EdgeURL string `json:"edgeUrl"`
-	}
-	if err := c.call("GET", path+"/setup", nil, &setup); err != nil {
-		return err
-	}
-	tf, err := c.planTokenFile(path, "", setup.EdgeURL != "")
+	tf, err := c.planTokenFile(path, "", plan.BaseURLs)
 	if err != nil {
 		return err
 	}
@@ -332,16 +365,23 @@ func (c *ctx) initWrite(plan *initPlan, path string) error {
 
 func (c *ctx) initNext(plan initPlan) []string {
 	var next []string
+	base := fmt.Sprintf("keystub init %s --env-file %s", plan.Env, plan.File)
+	if !strings.EqualFold(plan.KeyName, "personal") {
+		base += " --key-name " + plan.KeyName
+	}
 	if plan.DryRun && plan.Changes {
 		flags := ""
 		if plan.WriteEnv {
 			flags = " --write-env"
 		}
-		next = append(next, fmt.Sprintf("keystub init %s --env-file %s%s --yes   (after the person agrees to the plan)", plan.Env, plan.File, flags))
+		if plan.BaseURLs {
+			flags += " --base-urls"
+		}
+		next = append(next, base+flags+" --yes   (after the person agrees to the plan)")
 		return next
 	}
-	if plan.FileSet == nil {
-		next = append(next, fmt.Sprintf("keystub init %s --env-file %s --write-env   (only if the person agrees: puts a token in %s in place of the real keys, after copying the file to %s)", plan.Env, plan.File, plan.File, c.backupDir()))
+	if plan.FileSet == nil && len(plan.Steps) > 0 {
+		next = append(next, fmt.Sprintf("%s --write-env --base-urls --dry-run   (shows which variables a token would replace in %s; only with the person's yes, run it again with --yes in place of --dry-run, which copies the file to %s first)", base, plan.File, c.backupDir()))
 	}
 	next = append(next, fmt.Sprintf("keystub doctor %s --env-file %s", plan.Env, plan.File))
 	return next
@@ -373,7 +413,7 @@ func (c *ctx) printPlan(w io.Writer, plan initPlan) {
 		fmt.Fprintf(w, "  - %s left alone: %s\n", s.Var, s.Reason)
 	}
 	if plan.WriteEnv {
-		fmt.Fprintf(w, "  - put a new token in %s in place of the real keys (the file is copied to %s first)\n", plan.File, c.backupDir())
+		fmt.Fprintf(w, "  - put a new token in %s, setting %s (the file is copied to %s first)\n", plan.File, strings.Join(plan.WriteVars, ", "), c.backupDir())
 	} else {
 		fmt.Fprintf(w, "  - %s isn't changed\n", plan.File)
 	}
@@ -422,10 +462,15 @@ func (c *ctx) doctor(args []string) error {
 	add := func(name, status, format string, a ...any) {
 		checks = append(checks, check{name, status, fmt.Sprintf(format, a...)})
 	}
+	// report prints the checks: with --json one value on stdout, the
+	// result, or on a failure the error with the checks in it.
 	report := func() error {
 		failed := false
 		for _, ch := range checks {
 			failed = failed || ch.Status == "fail"
+		}
+		if failed && c.json {
+			return &Error{Code: ExitError, Message: "some checks failed", Extra: map[string]any{"env": env, "file": file, "ok": false, "checks": checks}}
 		}
 		err := c.emit(map[string]any{"env": env, "file": file, "ok": !failed, "checks": checks}, func(w io.Writer) {
 			for _, ch := range checks {
@@ -434,7 +479,7 @@ func (c *ctx) doctor(args []string) error {
 			}
 		})
 		if err == nil && failed {
-			return &Error{Code: ExitError, Message: "some checks failed", Extra: map[string]any{"checks": checks}}
+			return &Error{Code: ExitError, Message: "some checks failed"}
 		}
 		return err
 	}
@@ -468,7 +513,7 @@ func (c *ctx) doctor(args []string) error {
 
 	names, values, err := dotenvNames(file)
 	if err != nil {
-		add("env file", "warn", "%v", err)
+		add("env file", "fail", "%v", err)
 		return report()
 	}
 	reads, err := c.readers()

@@ -26,9 +26,11 @@ reads them itself. Add `--json` to every command.
 
 4. **Set up.** On their yes: `keystub init --yes --json`.
 
-5. **Swap the keys for a token**, only if the person agrees:
-   `keystub init --write-env --yes --json`. The old `.env` is copied to
-   `~/.keystub/backups` first; tell them where.
+5. **Swap the keys for a token**, only if the person agrees. First
+   `keystub init --write-env --base-urls --dry-run --json` and tell them
+   which variables it would set (`writeVars`). On their yes:
+   `keystub init --write-env --base-urls --yes --json`. The old `.env` is
+   copied to `~/.keystub/backups` first; tell them where.
 
 6. **Check.** `keystub doctor --json`, and tell the person what passed.
 

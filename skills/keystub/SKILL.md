@@ -89,9 +89,12 @@ in this folder and uses the environment `<folder>/dev`; name others with
 2. On their yes: `keystub init --yes --json`. It adds the services, saves
    each key straight from the file, makes the environment and links the
    keys. The `.env` file isn't changed.
-3. Ask whether to put a token in `.env` in place of the real keys. Only
-   on a yes: `keystub init --write-env --yes --json`. It answers with the
-   copy of the old file (`backup`); tell the user where it is.
+3. Ask whether to put a token in `.env` in place of the real keys. First
+   `keystub init --write-env --base-urls --dry-run --json`: `writeVars` are
+   the variables it would set (the key variables, and with `--base-urls`
+   each SDK's base URL on the edge); tell the user which. Only on a yes:
+   `keystub init --write-env --base-urls --yes --json`. It answers with
+   the copy of the old file (`backup`); tell the user where it is.
 4. Check it: `keystub doctor --json`. Each check is `ok`, `warn` or
    `fail`, with what to do in `detail`; exit code 1 means one failed.
 

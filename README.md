@@ -27,7 +27,7 @@ With a coding agent, ask it to set Keystub up for the project: the [skill](#the-
 
 ```bash
 keystub init --dry-run     # what it would do; then keystub init to do it
-keystub init --write-env   # also a token in .env in place of the real keys (asks; keeps a copy in ~/.keystub/backups)
+keystub init --write-env --base-urls   # also a token in .env in place of the real keys (asks; keeps a copy in ~/.keystub/backups)
 keystub doctor             # checks the setup and the token
 ```
 
@@ -105,7 +105,7 @@ Exit codes: 0 ok, 1 error, 2 usage, 3 not signed in, 4 not found, 5 conflict. Th
 
 ## The skill for coding agents
 
-[`skills/keystub/`](skills/keystub/SKILL.md) is an [Agent Skill](https://agentskills.io): a `SKILL.md` folder that teaches Claude Code, Codex, Cursor and other agents to move a project's keys into Keystub with the CLI alone. `keystub keys scan .env` finds the keys by name, `keys add … --from-env VAR --env-file .env` saves each one from the file, and `tokens create … --write-env .env --base-urls` puts a token where the keys were, so the agent sees neither a key nor the token. Its rules: no key's value in an argument or on screen, `--json` everywhere, and the user asked before anything is deleted. Its command guide, `references/cli-guide.md`, is a copy of [docs/llms.txt](docs/llms.txt), and the tests check that the two match and that every `keystub` command line in either one parses with the CLI.
+[`skills/keystub/`](skills/keystub/SKILL.md) is an [Agent Skill](https://agentskills.io): a `SKILL.md` folder that teaches Claude Code, Codex, Cursor and other agents to move a project's keys into Keystub with the CLI alone. `keystub keys scan .env` finds the keys by name, `keys add … --from-env VAR --env-file .env` saves each one from the file, and `tokens create … --write-env .env --base-urls --yes` puts a token where the keys were (after the user agrees; the old file is copied to `~/.keystub/backups`), so the agent sees neither a key nor the token. Its rules: no key's value in an argument or on screen, `--json` everywhere, and the user asked before anything is deleted. Its command guide, `references/cli-guide.md`, is a copy of [docs/llms.txt](docs/llms.txt), and the tests check that the two match and that every `keystub` command line in either one parses with the CLI.
 
 Install it in any of these ways.
 
