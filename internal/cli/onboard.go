@@ -440,7 +440,7 @@ func (c *ctx) printPlan(w io.Writer, plan initPlan) {
 		case st.SaveKey:
 			do = append(do, fmt.Sprintf("save its key from %s as %q", st.Var, plan.KeyName))
 		case st.Shared:
-			do = append(do, fmt.Sprintf("use the account's saved key %q, not the one in %s (--key-name NAME saves the file's)", st.Key, st.Var))
+			do = append(do, fmt.Sprintf("use the account's saved key %q (to save %s's value instead: --key-name NAME)", st.Key, st.Var))
 		default:
 			do = append(do, fmt.Sprintf("use the saved key %q", st.Key))
 		}
