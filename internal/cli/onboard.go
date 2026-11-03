@@ -22,7 +22,9 @@ type initStep struct {
 	Service    string `json:"service"`
 	Var        string `json:"var"`
 	AddService bool   `json:"addService"` // the account doesn't have the service yet
-	SaveKey    bool   `json:"saveKey"`    // no saved key of that name yet
+	SaveKey    bool   `json:"saveKey"`    // no saved key to use yet: save the file's
+	Key        string `json:"key"`        // the saved key's name it links
+	Shared     bool   `json:"shared"`     // Key is one the account had already, not --key-name
 	Link       bool   `json:"link"`       // the environment doesn't link the service yet
 	LinkedTo   string `json:"linkedTo,omitempty"`
 }
@@ -115,6 +117,7 @@ func (c *ctx) initEnv(args []string) error {
 	if file == "" {
 		file = ".env"
 	}
+	named := p.flags["key-name"] != ""
 	plan := initPlan{File: file, KeyName: p.flags["key-name"], WriteEnv: p.has("write-env"), BaseURLs: p.has("base-urls"), DryRun: p.has("dry-run"), Steps: []initStep{}, Skipped: []skipped{}}
 	if plan.BaseURLs && !plan.WriteEnv {
 		return usageErr("--base-urls goes with --write-env")
@@ -200,11 +203,9 @@ func (c *ctx) initEnv(args []string) error {
 			continue
 		}
 		seen[r.service.ID] = true
-		st := initStep{Service: r.service.ID, Var: n, AddService: !r.added, SaveKey: true, Link: true}
-		for _, k := range keys {
-			if k.Service == st.Service && strings.EqualFold(k.Name, plan.KeyName) {
-				st.SaveKey = false
-			}
+		st := initStep{Service: r.service.ID, Var: n, AddService: !r.added, SaveKey: true, Link: true, Key: plan.KeyName}
+		if k := pickKey(keys, st.Service, plan.KeyName, named); k != nil {
+			st.SaveKey, st.Key, st.Shared = false, k.Name, !strings.EqualFold(k.Name, plan.KeyName)
 		}
 		if to, ok := linked[st.Service]; ok {
 			st.Link, st.LinkedTo = false, to
@@ -294,7 +295,7 @@ func (c *ctx) initEnv(args []string) error {
 		if !st.Link {
 			continue
 		}
-		k, err := c.findKey(plan.KeyName, st.Service)
+		k, err := c.findKey(st.Key, st.Service)
 		if err != nil {
 			return err
 		}
@@ -320,6 +321,28 @@ func (c *ctx) initEnv(args []string) error {
 			fmt.Fprintln(w, "Next:", s)
 		}
 	})
+}
+
+// pickKey is the saved key init uses for a service instead of saving
+// the file's: the one named name; else, when no name was given, the
+// account's own for the service (a teammate's, say), the one linked in
+// the most environments, so a team shares one key rather than each
+// person saving a copy. nil means save the file's.
+func pickKey(keys []savedKey, service, name string, named bool) *savedKey {
+	var best *savedKey
+	for i := range keys {
+		k := &keys[i]
+		if k.Service != service {
+			continue
+		}
+		if strings.EqualFold(k.Name, name) {
+			return k
+		}
+		if !named && (best == nil || len(k.LinkedIn) > len(best.LinkedIn) || (len(k.LinkedIn) == len(best.LinkedIn) && k.Name < best.Name)) {
+			best = k
+		}
+	}
+	return best
 }
 
 // makeEnv makes an environment, and its project first if it's new.
@@ -407,10 +430,13 @@ func (c *ctx) printPlan(w io.Writer, plan initPlan) {
 		if st.AddService {
 			do = append(do, "add the service")
 		}
-		if st.SaveKey {
+		switch {
+		case st.SaveKey:
 			do = append(do, fmt.Sprintf("save its key from %s as %q", st.Var, plan.KeyName))
-		} else {
-			do = append(do, fmt.Sprintf("use the saved key %q", plan.KeyName))
+		case st.Shared:
+			do = append(do, fmt.Sprintf("use the account's saved key %q, not the one in %s (--key-name NAME saves the file's)", st.Key, st.Var))
+		default:
+			do = append(do, fmt.Sprintf("use the saved key %q", st.Key))
 		}
 		if st.Link {
 			do = append(do, "link it")

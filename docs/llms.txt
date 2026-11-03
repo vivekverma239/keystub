@@ -31,9 +31,11 @@ The short way, for a project with a .env file:
                                        the real keys, and each SDK's base URL on the edge)
    keystub doctor --json              (checks sign-in, links, the .env file, and the token)
    init and doctor read .env in this folder and use the environment
-   <folder>/dev; name others with --env-file FILE and PROJECT/ENV. init saves
-   keys as "personal" (--key-name NAME), reuses a saved key of that name, and
-   leaves services the environment already links as they are.
+   <folder>/dev; name others with --env-file FILE and PROJECT/ENV. For a
+   service the account already has a saved key for (a teammate's), init links
+   that key, the one linked most, and doesn't save the file's; otherwise it
+   saves the file's as "personal". --key-name NAME uses or saves that name
+   instead. It leaves services the environment already links as they are.
 The steps below do the same one at a time.
 
 1. Sign in.

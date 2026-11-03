@@ -84,8 +84,11 @@ in this folder and uses the environment `<folder>/dev`; name others with
 
 1. Show the plan, which changes nothing:
    `keystub init --dry-run --json`. Tell the user, in a few lines, which
-   services and variables it moves, the environment, and the key name
-   (`personal`; `--key-name team` for another), and what it leaves alone.
+   services and variables it moves, the environment, and which saved key
+   each service gets (`key`). Where the account already has a key for a
+   service, a teammate's say, init links it rather than saving the one in
+   the file (`shared: true`); say so, since the file's key is then not used.
+   `--key-name NAME` saves or uses that name instead. Say what it leaves alone.
 2. On their yes: `keystub init --yes --json`. It adds the services, saves
    each key straight from the file, makes the environment and links the
    keys. The `.env` file isn't changed.
