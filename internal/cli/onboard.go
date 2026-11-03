@@ -186,27 +186,33 @@ func (c *ctx) initEnv(args []string) error {
 		case holdsToken(values[n]):
 			plan.Skipped = append(plan.Skipped, skipped{n, "already a Keystub token"})
 			continue
-		case strings.TrimSpace(values[n]) == "":
-			plan.Skipped = append(plan.Skipped, skipped{n, "empty"})
-			continue
-		case r.templated:
-			plan.Skipped = append(plan.Skipped, skipped{n, "the key is inside a template; save it with keystub keys add " + r.service.ID})
-			continue
 		case seen[r.service.ID]:
 			plan.Skipped = append(plan.Skipped, skipped{n, "another variable already gives the " + r.service.ID + " key"})
 			continue
 		}
-		// A value dotenv loaders read differently from the file (a stray #
-		// or $, odd quotes) isn't saved: the person fixes the line first.
-		if _, err := dotenvValue(file, n); err != nil {
-			plan.Skipped = append(plan.Skipped, skipped{n, err.Error()})
-			continue
-		}
-		seen[r.service.ID] = true
 		st := initStep{Service: r.service.ID, Var: n, AddService: !r.added, SaveKey: true, Link: true, Key: plan.KeyName}
 		if k := pickKey(keys, st.Service, plan.KeyName, named); k != nil {
+			// A saved key to link: the file's value isn't read, so it may be
+			// empty (a copied .env.example) or anything else.
 			st.SaveKey, st.Key, st.Shared = false, k.Name, !strings.EqualFold(k.Name, plan.KeyName)
+		} else {
+			reason := ""
+			if strings.TrimSpace(values[n]) == "" {
+				reason = "empty"
+			} else if r.templated {
+				reason = "the key is inside a template; save it with keystub keys add " + r.service.ID
+			} else if _, err := dotenvValue(file, n); err != nil {
+				// A value dotenv loaders read differently from the file (a
+				// stray # or $, odd quotes) isn't saved: the person fixes
+				// the line first.
+				reason = err.Error()
+			}
+			if reason != "" {
+				plan.Skipped = append(plan.Skipped, skipped{n, reason})
+				continue
+			}
 		}
+		seen[r.service.ID] = true
 		if to, ok := linked[st.Service]; ok {
 			st.Link, st.LinkedTo = false, to
 		}

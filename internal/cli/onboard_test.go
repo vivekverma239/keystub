@@ -212,6 +212,14 @@ func TestInitUsesTheAccountsKey(t *testing.T) {
 		t.Errorf("%d openai keys: init saved a copy", n)
 	}
 
+	// A copied .env.example, with no key of the teammate's own, still
+	// gets the team's.
+	path = writeDotenv(t, "worker", "OPENAI_API_KEY=\n")
+	r.must("", "init", "--env-file", path, "--yes")
+	if got, _ := r.engine.RealKey(context.Background(), "worker/dev", "openai"); got != "sk-team-openai" {
+		t.Errorf("empty value: linked %q", got)
+	}
+
 	// Named, the file's key is saved under that name instead.
 	path = writeDotenv(t, "cli", "OPENAI_API_KEY=sk-mine\n")
 	r.must("", "init", "--env-file", path, "--key-name", "mine", "--yes")
