@@ -13,7 +13,8 @@ reads them itself. Add `--json` to every command.
    curl -fsSL https://raw.githubusercontent.com/vivekverma239/keystub/main/install.sh | sh
    ```
 
-   Use `~/.local/bin/keystub` if `keystub` still isn't on the PATH.
+   Use `~/.local/bin/keystub` if `keystub` still isn't on the PATH. With
+   Node and no `curl`, `npm install -g keystub` installs the same binary.
 
 2. **Sign in.** If `keystub whoami --json` exits 3, run
    `keystub login --server {{SERVER}} --json` in the background. It opens

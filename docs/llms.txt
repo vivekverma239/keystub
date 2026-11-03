@@ -21,6 +21,7 @@ Rules for agents:
 
 The short way, for a project with a .env file:
    curl -fsSL https://raw.githubusercontent.com/vivekverma239/keystub/main/install.sh | sh
+   (or, with Node: npm install -g keystub)
    keystub login --server https://app.keystub.app   (opens the browser; approve the code)
    keystub init --dry-run --json      (the plan: services, keys, the environment; changes nothing)
    keystub init --yes --json          (after the person agrees: saves the keys from .env, links them)
