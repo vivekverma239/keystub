@@ -63,7 +63,9 @@ Usage:
                 [--dir DIR] [--json]
 
 Set Keystub up from the command line (hosted or self-hosted):
-  keystub login | logout | whoami
+  keystub login [--no-browser] | logout | whoami
+  keystub init [PROJECT/ENV] [--env-file FILE] [--key-name NAME] [--write-env] [--dry-run]
+  keystub doctor [PROJECT/ENV] [--env-file FILE]
   keystub services list | add | remove
   keystub keys list | add | scan | show | replace | rename | limits | delete
   keystub projects list | limits
@@ -73,6 +75,7 @@ Set Keystub up from the command line (hosted or self-hosted):
   keystub setup PROJECT/ENV
   keystub ca [-o FILE]
   keystub help agents           a setup guide a coding agent can follow
+  keystub version
 These take --json, --yes (for deletes) and --server URL ($KEYSTUB_SERVER;
 default: the server you logged in to, else a keystub serve on this
 machine, else https://app.keystub.app). Credentials: $KEYSTUB_API_KEY,
@@ -109,6 +112,10 @@ macOS Keychain by default, or in $KEYSTUB_MASTER_KEY (64 hex characters) on
 servers; --secrets picks explicitly.
 `
 
+// version is the release this binary was built from, set at build time
+// (-ldflags "-X main.version=v0.1.0"); "dev" for a local build.
+var version = "dev"
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprint(os.Stderr, usageText)
@@ -132,6 +139,9 @@ func main() {
 		err = env(os.Args[2:])
 	case "skill":
 		err = skillCmd(os.Args[2:])
+	case "version", "--version":
+		fmt.Println("keystub", version)
+		return
 	case "help", "-h", "--help":
 		if len(os.Args) > 2 && os.Args[2] == "agents" {
 			fmt.Print(docs.AgentGuide)

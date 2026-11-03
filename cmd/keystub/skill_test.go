@@ -117,6 +117,13 @@ func TestSkillInstall(t *testing.T) {
 // that doesn't with 2.
 func TestDocumentedCommandsExist(t *testing.T) {
 	texts := map[string]string{"docs/llms.txt": docs.AgentGuide}
+	// The start page a hosted server serves at /start, with its own URL
+	// for {{SERVER}}.
+	start, err := os.ReadFile("../../docs/start.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	texts["docs/start.md"] = strings.ReplaceAll(string(start), "{{SERVER}}", "https://app.keystub.app")
 	_ = fs.WalkDir(skills.Keystub, ".", func(p string, d fs.DirEntry, err error) error {
 		if err == nil && !d.IsDir() && strings.HasSuffix(p, ".md") {
 			b, _ := fs.ReadFile(skills.Keystub, p)
@@ -240,6 +247,11 @@ func checkCommand(t *testing.T, words []string) error {
 		}
 		_, err := parseSkill(args, io.Discard)
 		return err
+	case cmd == "version":
+		if len(args) > 0 {
+			return errors.New("version takes no arguments")
+		}
+		return nil
 	case cmd == "help":
 		if len(args) > 0 && !slices.Equal(args, []string{"agents"}) {
 			return errors.New("help takes only agents")

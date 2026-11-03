@@ -139,9 +139,29 @@ func (c *ctx) planTokenFile(path, svc string, withBase bool) (*tokenFile, error)
 	return plan, nil
 }
 
+// names are the variables the plan sets in the file.
+func (plan tokenFile) names() []string {
+	var out []string
+	for _, v := range plan.baseURLs {
+		out = append(out, v.name)
+	}
+	for _, k := range plan.keys {
+		name, _, _ := strings.Cut(k, "=")
+		out = append(out, name)
+	}
+	return out
+}
+
+// confirmWrite asks before a token goes into a dotenv file in place of
+// the real keys: --yes, or a "y" typed at the terminal.
+func (c *ctx) confirmWrite(file string, plan tokenFile) error {
+	return c.confirm(fmt.Sprintf("Write a new token into %s, setting %s (the file is copied to %s first)", file, strings.Join(plan.names(), ", "), c.backupDir()))
+}
+
 // writeToken puts a new token into a dotenv file, where the real keys
-// were, and prints what it did but never the token.
-func (c *ctx) writeToken(file string, plan tokenFile, t token) error {
+// were, and prints what it did but never the token. backup is the copy
+// of the old file, if there was one.
+func (c *ctx) writeToken(file string, plan tokenFile, t token, backup string) error {
 	compact := "skstub" + strings.TrimPrefix(t.Secret, "sk-stub-")
 	vars := append([]envVar(nil), plan.baseURLs...)
 	for _, k := range plan.keys {
@@ -159,7 +179,14 @@ func (c *ctx) writeToken(file string, plan tokenFile, t token) error {
 		set = append(set, v.name)
 	}
 	t.Secret = ""
-	return c.emit(map[string]any{"token": t, "file": file, "set": set}, func(io.Writer) {
+	out := map[string]any{"token": t, "file": file, "set": set}
+	if backup != "" {
+		out["backup"] = backup
+	}
+	return c.emit(out, func(io.Writer) {
 		fmt.Fprintf(c.Stderr, "Token %s (%s, id %s) is in %s as %s. It isn't shown anywhere else.\n", t.Name, t.what(), t.ID, file, strings.Join(set, ", "))
+		if backup != "" {
+			fmt.Fprintf(c.Stderr, "The old file is at %s; put it back with: cp %q %q\n", backup, backup, file)
+		}
 	})
 }

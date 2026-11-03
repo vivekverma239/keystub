@@ -548,11 +548,17 @@ func TestDeviceLogin(t *testing.T) {
 	srv := fakeHosted(t, 200)
 	r := &rig{t: t, home: t.TempDir(), env: map[string]string{}}
 	var slept []time.Duration
+	var opened []string
 	var out, errb bytes.Buffer
 	code := Main(Env{Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errb, Getenv: func(k string) string { return r.env[k] },
-		Home: r.home, Hostname: "testbox", Sleep: func(d time.Duration) { slept = append(slept, d) }}, "login", []string{"--server", srv.URL, "--json"})
+		Home: r.home, Hostname: "testbox", Sleep: func(d time.Duration) { slept = append(slept, d) },
+		OpenURL: func(u string) error { opened = append(opened, u); return nil }}, "login", []string{"--server", srv.URL, "--json"})
 	if code != 0 || !strings.Contains(errb.String(), "ABCD-EFGH") || len(slept) != 2 || slept[0] != 5*time.Second {
 		t.Fatalf("login: %d %s %s %v", code, out.String(), errb.String(), slept)
+	}
+	// The approval page opens by itself, with the code on it.
+	if len(opened) != 1 || !strings.Contains(opened[0], "ABCD-EFGH") || !strings.Contains(errb.String(), "opened in your browser") {
+		t.Fatalf("opened %v; stderr %s", opened, errb.String())
 	}
 	if strings.Contains(out.String(), "skcli_abc") {
 		t.Fatal("login printed the token")
@@ -602,8 +608,13 @@ func TestDeviceLoginDenied(t *testing.T) {
 	r := &rig{t: t, home: t.TempDir(), env: map[string]string{"KEYSTUB_SERVER": srv.URL}}
 	var slept []time.Duration
 	var out, errb bytes.Buffer
+	opened := false
 	code := Main(Env{Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errb, Getenv: func(k string) string { return r.env[k] },
-		Home: r.home, Hostname: "testbox", Sleep: func(d time.Duration) { slept = append(slept, d) }}, "login", nil)
+		Home: r.home, Hostname: "testbox", Sleep: func(d time.Duration) { slept = append(slept, d) },
+		OpenURL: func(string) error { opened = true; return nil }}, "login", []string{"--no-browser"})
+	if opened {
+		t.Error("--no-browser opened the browser")
+	}
 	if code != ExitNoAuth || !strings.Contains(errb.String(), "expired or was turned down") {
 		t.Fatalf("denied: %d %s", code, errb.String())
 	}

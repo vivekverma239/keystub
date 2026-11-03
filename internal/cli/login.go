@@ -57,11 +57,11 @@ func (c *ctx) saveCredentials(cr credentials) error {
 // login signs in with a code approved in the browser, against the hosted
 // /api/cli/login routes (protocol/api.md).
 func (c *ctx) login(args []string) error {
-	p, err := parse(args, []string{"name"}, nil)
+	p, err := parse(args, []string{"name"}, []string{"no-browser"})
 	if err != nil {
 		return err
 	}
-	if err := p.want(0, 0, "login [--name NAME] [--server URL]"); err != nil {
+	if err := p.want(0, 0, "login [--name NAME] [--server URL] [--no-browser]"); err != nil {
 		return err
 	}
 	if local := c.localServer(); local != "" && sameServer(local, c.server) {
@@ -90,7 +90,11 @@ func (c *ctx) login(args []string) error {
 	if start.Poll == "" || start.Code == "" {
 		return errors.New("the server's login answer has no code")
 	}
-	fmt.Fprintf(c.Stderr, "Open %s and approve the code %s.\nWaiting…\n", start.URL, start.Code)
+	fmt.Fprintf(c.Stderr, "Approve the code %s at %s\n", start.Code, start.URL)
+	if !p.has("no-browser") && c.OpenURL != nil && c.OpenURL(start.URL) == nil {
+		fmt.Fprintln(c.Stderr, "(opened in your browser)")
+	}
+	fmt.Fprintln(c.Stderr, "Waiting…")
 	interval := 5 * time.Second // RFC 8628's default, so a missing interval never means a tight loop
 	if start.Interval > 0 {
 		interval = time.Duration(start.Interval) * time.Second

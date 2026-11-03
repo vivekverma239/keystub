@@ -16,9 +16,28 @@ Rules for agents:
 - A new token is printed once. Plain output puts it alone on stdout;
   with --json it is the "token" field. With --write-env FILE it goes into
   that .env file instead and isn't printed at all.
+- Writing a .env file asks first (--yes when nothing can ask) and copies
+  the old file to ~/.keystub/backups before changing it.
+
+The short way, for a project with a .env file:
+   curl -fsSL https://raw.githubusercontent.com/vivekverma239/keystub/main/install.sh | sh
+   keystub login --server https://app.keystub.app   (opens the browser; approve the code)
+   keystub init --dry-run --json      (the plan: services, keys, the environment; changes nothing)
+   keystub init --yes --json          (after the person agrees: saves the keys from .env, links them)
+   keystub init --write-env --base-urls --dry-run --json
+                                      (the variables a token would replace in .env; "writeVars")
+   keystub init --write-env --base-urls --yes --json
+                                      (only if the person agrees: a token in .env in place of
+                                       the real keys, and each SDK's base URL on the edge)
+   keystub doctor --json              (checks sign-in, links, the .env file, and the token)
+   init and doctor read .env in this folder and use the environment
+   <folder>/dev; name others with --env-file FILE and PROJECT/ENV. init saves
+   keys as "personal" (--key-name NAME), reuses a saved key of that name, and
+   leaves services the environment already links as they are.
+The steps below do the same one at a time.
 
 1. Sign in.
-   Hosted:       keystub login            (prints a code to approve in the browser)
+   Hosted:       keystub login            (opens the browser to approve a code; --no-browser prints it only)
    CI or agents: export KEYSTUB_API_KEY=… (an API key from the dashboard)
                  and KEYSTUB_SERVER=https://app.keystub.app (the key's server;
                  the CLI won't send the key without one named)
@@ -51,8 +70,9 @@ Rules for agents:
    the environment links; --ttl makes it expire.
    TOKEN=$(keystub tokens create my-app/dev --name sandbox-1 --ttl 2h)
    or straight into a .env file, where the real keys were (and, with
-   --base-urls, each SDK's base URL on the edge):
-   keystub tokens create my-app/dev --name local --write-env .env --base-urls
+   --base-urls, each SDK's base URL on the edge). It asks first, and copies
+   the old file to ~/.keystub/backups:
+   keystub tokens create my-app/dev --name local --write-env .env --base-urls --yes
 
 7. Use it. Set the service's key variable to the token and send requests
    through Keystub, either through its proxy:

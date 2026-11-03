@@ -1,6 +1,6 @@
 // Package cli is the `keystub` commands that drive a server's JSON API
-// (protocol/api.md): login, keys, envs, tokens, services, usage, setup
-// and ca. One CLI drives the hosted service and a self-hosted server.
+// (protocol/api.md): login, init, doctor, keys, envs, tokens, services,
+// usage, setup and ca. One CLI drives the hosted service and a self-hosted server.
 //
 // It is written for people and their coding agents alike: every command
 // takes --json, nothing prompts when stdin isn't a terminal, exit codes
@@ -37,7 +37,7 @@ const (
 )
 
 // Commands are the top-level commands this package runs.
-var Commands = []string{"login", "logout", "whoami", "keys", "projects", "envs", "tokens", "services", "usage", "setup", "ca"}
+var Commands = []string{"login", "logout", "whoami", "init", "doctor", "keys", "projects", "envs", "tokens", "services", "usage", "setup", "ca"}
 
 // Env is everything a command touches outside itself, so tests can run
 // it in-process.
@@ -52,6 +52,9 @@ type Env struct {
 	Sleep          func(time.Duration)
 	// ReadSecret reads a value typed at the terminal without echoing it.
 	ReadSecret func(prompt string) (string, error)
+	// OpenURL opens a page in the person's browser; nil, or an error, when
+	// there's none to open (a test, or a shell over SSH).
+	OpenURL func(url string) error
 }
 
 // Error is a failure with its exit code.
@@ -121,6 +124,10 @@ func (c *ctx) dispatch(cmd string, args []string) error {
 		return c.logout(args)
 	case "whoami":
 		return c.whoami(args)
+	case "init":
+		return c.initEnv(args)
+	case "doctor":
+		return c.doctor(args)
 	case "keys":
 		return c.keys(args)
 	case "envs":

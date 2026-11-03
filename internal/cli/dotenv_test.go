@@ -185,13 +185,39 @@ func TestSetupFromDotenv(t *testing.T) {
 		t.Fatalf("saved %q", got)
 	}
 
-	res = r.must("", "tokens", "create", "my-app/dev", "--name", "local", "--write-env", path, "--base-urls", "--json")
+	// Nothing is written, or made, until the person says yes.
+	orig, _ := os.ReadFile(path)
+	if res := r.run("", "tokens", "create", "my-app/dev", "--name", "local", "--write-env", path, "--base-urls", "--json"); res.code != ExitUsage || !strings.Contains(res.stdout, "--yes") {
+		t.Fatalf("--write-env without --yes: %d %s", res.code, res.stdout)
+	}
+	if b, _ := os.ReadFile(path); string(b) != string(orig) {
+		t.Fatal("the file changed before the person said yes")
+	}
+	if n := len(r.must("", "tokens", "list", "my-app/dev", "--json").json(t)["tokens"].([]any)); n != 0 {
+		t.Fatalf("%d tokens made before the person said yes", n)
+	}
+	if _, err := os.Stat(filepath.Join(r.home, "backups")); err == nil {
+		t.Fatal("a backup before the person said yes")
+	}
+
+	res = r.must("", "tokens", "create", "my-app/dev", "--name", "local", "--write-env", path, "--base-urls", "--json", "--yes")
 	if strings.Contains(res.stdout+res.stderr, core.TokenPrefix) {
 		t.Fatalf("the token was printed: %s %s", res.stdout, res.stderr)
 	}
 	out := res.json(t)
 	if out["file"] != path || out["token"].(map[string]any)["id"] == "" {
 		t.Errorf("answer %v", out)
+	}
+	// The old file is kept, outside the project and for its owner alone.
+	backup, _ := out["backup"].(string)
+	if filepath.Dir(backup) != filepath.Join(r.home, "backups") {
+		t.Fatalf("backup at %q", backup)
+	}
+	if b, _ := os.ReadFile(backup); string(b) != string(orig) {
+		t.Errorf("backup holds:\n%s", b)
+	}
+	if st, err := os.Stat(backup); err != nil || st.Mode().Perm() != 0o600 {
+		t.Errorf("backup mode: %v %v", st, err)
 	}
 	b, _ := os.ReadFile(path)
 	text := string(b)
@@ -214,7 +240,10 @@ func TestSetupFromDotenv(t *testing.T) {
 
 	// A service token writes only its service's variables.
 	other := filepath.Join(t.TempDir(), ".env")
-	r.must("", "tokens", "create", "my-app/dev", "--name", "only-openai", "--service", "openai", "--write-env", other)
+	res = r.must("", "tokens", "create", "my-app/dev", "--name", "only-openai", "--service", "openai", "--write-env", other, "--yes", "--json")
+	if _, ok := res.json(t)["backup"]; ok {
+		t.Error("a backup of a file that wasn't there")
+	}
 	if b, _ := os.ReadFile(other); strings.Contains(string(b), "ANTHROPIC") || !strings.Contains(string(b), "OPENAI_API_KEY=sk-stub-") {
 		t.Errorf("service token file:\n%s", b)
 	}
@@ -235,7 +264,7 @@ func TestSetupFromDotenv(t *testing.T) {
 	// Nothing to write: no token is made.
 	r.must("", "envs", "add", "my-app/empty")
 	before := len(r.must("", "tokens", "list", "my-app/empty", "--json").json(t)["tokens"].([]any))
-	if res := r.run("", "tokens", "create", "my-app/empty", "--name", "z", "--write-env", other); res.code != ExitUsage {
+	if res := r.run("", "tokens", "create", "my-app/empty", "--name", "z", "--write-env", other, "--yes"); res.code != ExitUsage {
 		t.Errorf("an environment with no links: %d %s", res.code, res.stderr)
 	}
 	if after := len(r.must("", "tokens", "list", "my-app/empty", "--json").json(t)["tokens"].([]any)); after != before {
