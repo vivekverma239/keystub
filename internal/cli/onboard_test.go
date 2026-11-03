@@ -191,6 +191,43 @@ func TestInitRefusals(t *testing.T) {
 	}
 }
 
+func TestInitUsesTheAccountsKey(t *testing.T) {
+	r := newRig(t)
+	// A teammate saved the team's OpenAI key and linked it.
+	r.must("", "services", "add", "openai")
+	r.must("sk-team-openai", "keys", "add", "openai", "--name", "team")
+	r.must("", "envs", "add", "web/dev")
+	r.must("", "envs", "link", "web/dev", "openai", "team", "--no-token")
+	path := writeDotenv(t, "api", "OPENAI_API_KEY=sk-mine\n")
+
+	plan := r.must("", "init", "--env-file", path, "--dry-run", "--json")
+	if !strings.Contains(plan.stdout, `"key": "team"`) || !strings.Contains(plan.stdout, `"shared": true`) || !strings.Contains(plan.stdout, `"saveKey": false`) {
+		t.Fatalf("plan: %s", plan.stdout)
+	}
+	r.must("", "init", "--env-file", path, "--yes")
+	if got, _ := r.engine.RealKey(context.Background(), "api/dev", "openai"); got != "sk-team-openai" {
+		t.Errorf("linked %q, want the team's key", got)
+	}
+	if n := len(r.must("", "keys", "list", "--service", "openai", "--json").json(t)["keys"].([]any)); n != 1 {
+		t.Errorf("%d openai keys: init saved a copy", n)
+	}
+
+	// A copied .env.example, with no key of the teammate's own, still
+	// gets the team's.
+	path = writeDotenv(t, "worker", "OPENAI_API_KEY=\n")
+	r.must("", "init", "--env-file", path, "--yes")
+	if got, _ := r.engine.RealKey(context.Background(), "worker/dev", "openai"); got != "sk-team-openai" {
+		t.Errorf("empty value: linked %q", got)
+	}
+
+	// Named, the file's key is saved under that name instead.
+	path = writeDotenv(t, "cli", "OPENAI_API_KEY=sk-mine\n")
+	r.must("", "init", "--env-file", path, "--key-name", "mine", "--yes")
+	if got, _ := r.engine.RealKey(context.Background(), "cli/dev", "openai"); got != "sk-mine" {
+		t.Errorf("--key-name linked %q", got)
+	}
+}
+
 func TestInitExplainsSkippedKeys(t *testing.T) {
 	r := newRig(t)
 	path := writeDotenv(t, "app", "OPENAI_API_KEY=sk-a$b\n")
