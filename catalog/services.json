@@ -625,6 +625,25 @@
       }
     },
     {
+      "id": "minimax",
+      "name": "MiniMax",
+      "category": "llm",
+      "docs": "https://platform.minimax.io/docs/llms-full.txt",
+      "note": "A key works only in its own region: api.minimax.io (and api-uw.minimax.io for speech) internationally, api.minimax.cn in China. For the /anthropic endpoint set ANTHROPIC_AUTH_TOKEN, not ANTHROPIC_API_KEY (x-api-key).",
+      "hosts": [
+        "api.minimax.io",
+        "api-uw.minimax.io",
+        "api.minimax.cn"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "MINIMAX_API_KEY"
+      ]
+    },
+    {
       "id": "xai",
       "name": "xAI",
       "category": "llm",
@@ -933,6 +952,76 @@
       ]
     },
     {
+      "id": "exa",
+      "name": "Exa",
+      "category": "search",
+      "docs": "https://docs.exa.ai/reference/getting-started",
+      "hosts": [
+        "api.exa.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "EXA_API_KEY"
+      ]
+    },
+    {
+      "id": "parallel",
+      "name": "Parallel",
+      "category": "search",
+      "docs": "https://docs.parallel.ai/api-reference",
+      "note": "The API takes the key in x-api-key; the MCP server (mcp.parallel.ai) takes it as a bearer token, which is swapped where it is.",
+      "hosts": [
+        "api.parallel.ai",
+        "eu.parallel.ai",
+        "mcp.parallel.ai"
+      ],
+      "auth": {
+        "header": "x-api-key",
+        "format": "{key}"
+      },
+      "envVars": [
+        "PARALLEL_API_KEY"
+      ]
+    },
+    {
+      "id": "firecrawl",
+      "name": "Firecrawl",
+      "category": "search",
+      "docs": "https://docs.firecrawl.dev/api-reference/introduction",
+      "note": "The JS SDK's crawl watcher sends the key as a WebSocket subprotocol, which Keystub refuses; without it the SDK polls.",
+      "hosts": [
+        "api.firecrawl.dev"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "FIRECRAWL_API_KEY"
+      ]
+    },
+    {
+      "id": "brightdata",
+      "name": "Bright Data",
+      "category": "search",
+      "docs": "https://docs.brightdata.com/api-reference/authentication",
+      "note": "The REST API only; proxy zones and the Browser API use their own username and password.",
+      "hosts": [
+        "api.brightdata.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "BRIGHTDATA_API_TOKEN",
+        "BRIGHTDATA_API_KEY"
+      ]
+    },
+    {
       "id": "replicate",
       "name": "Replicate",
       "category": "llm",
@@ -948,6 +1037,28 @@
         "REPLICATE_API_TOKEN"
       ],
       "note": "No quick start: REPLICATE_BASE_URL means the bare host to the Python SDK 1.x but includes /v1 for the CLI and SDK 2.x."
+    },
+    {
+      "id": "fal",
+      "name": "fal",
+      "category": "llm",
+      "docs": "https://fal.ai/docs/model-apis/model-endpoints/queue",
+      "note": "A key made of an ID and a secret is saved as ID:SECRET. The Python client retries on falrun.com, listed too. Realtime and CDN uploads use short-lived tokens, not the key.",
+      "hosts": [
+        "fal.run",
+        "queue.fal.run",
+        "rest.fal.ai",
+        "falrun.com",
+        "queue.falrun.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Key {key}"
+      },
+      "envVars": [
+        "FAL_KEY",
+        "FAL_API_KEY"
+      ]
     },
     {
       "id": "huggingface",
@@ -1025,6 +1136,25 @@
       ]
     },
     {
+      "id": "qstash",
+      "name": "Upstash QStash",
+      "category": "infrastructure",
+      "docs": "https://upstash.com/docs/qstash/api/authentication",
+      "note": "Each region has its own token, so a multi-region setup needs a saved key per region. The ?qstash_token= form isn't covered.",
+      "hosts": [
+        "qstash.upstash.io",
+        "qstash-eu-central-1.upstash.io",
+        "qstash-us-east-1.upstash.io"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "QSTASH_TOKEN"
+      ]
+    },
+    {
       "id": "neon",
       "name": "Neon",
       "category": "database",
@@ -1077,6 +1207,61 @@
       },
       "envVars": [
         "RAILWAY_API_TOKEN"
+      ]
+    },
+    {
+      "id": "fly",
+      "name": "Fly.io",
+      "category": "infrastructure",
+      "docs": "https://fly.io/auth.md",
+      "note": "Save the whole token as fly tokens create prints it, FlyV1 prefix included: Fly takes it as a bearer token, prefix and all. Covers the Machines API and the GraphQL API; fly deploy also pushes images to registry.fly.io, which isn't covered.",
+      "hosts": [
+        "api.machines.dev",
+        "api.fly.io"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "FLY_API_TOKEN"
+      ]
+    },
+    {
+      "id": "runpod",
+      "name": "RunPod",
+      "category": "infrastructure",
+      "docs": "https://docs.runpod.io/api-reference/overview",
+      "note": "REST, GraphQL and serverless endpoints, plus load-balancing endpoints at <endpoint-id>.api.runpod.ai. The SDKs don't read RUNPOD_API_KEY themselves; the docs' examples pass it in.",
+      "hosts": [
+        "rest.runpod.io",
+        "api.runpod.io",
+        "api.runpod.ai",
+        "*.api.runpod.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "RUNPOD_API_KEY"
+      ]
+    },
+    {
+      "id": "browserbase",
+      "name": "Browserbase",
+      "category": "infrastructure",
+      "docs": "https://docs.browserbase.com/reference/api/overview",
+      "note": "The REST API only: connecting a browser with ?apiKey= in the URL isn't covered; use the session's connectUrl.",
+      "hosts": [
+        "api.browserbase.com"
+      ],
+      "auth": {
+        "header": "X-BB-API-Key",
+        "format": "{key}"
+      },
+      "envVars": [
+        "BROWSERBASE_API_KEY"
       ]
     },
     {
@@ -1164,6 +1349,62 @@
       ]
     },
     {
+      "id": "axiom",
+      "name": "Axiom",
+      "category": "observability",
+      "docs": "https://axiom.co/docs/reference/tokens",
+      "note": "Personal tokens also need X-Axiom-Org-Id, which isn't a secret.",
+      "hosts": [
+        "api.axiom.co",
+        "api.eu.axiom.co",
+        "us-east-1.aws.edge.axiom.co",
+        "eu-central-1.aws.edge.axiom.co"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "AXIOM_TOKEN"
+      ]
+    },
+    {
+      "id": "laminar",
+      "name": "Laminar",
+      "category": "observability",
+      "docs": "https://docs.lmnr.ai/tracing/otel",
+      "note": "Traces over OTLP/HTTP on 443; the SDK's default OTLP/gRPC on port 8443 doesn't go through Keystub, so force HTTP.",
+      "hosts": [
+        "api.lmnr.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "LMNR_PROJECT_API_KEY"
+      ]
+    },
+    {
+      "id": "braintrust",
+      "name": "Braintrust",
+      "category": "observability",
+      "docs": "https://docs.braintrust.dev/reference/api",
+      "note": "The SDK signs in at www.braintrust.dev first, then uses the org's API host. Self-hosted data planes aren't covered.",
+      "hosts": [
+        "www.braintrust.dev",
+        "api.braintrust.dev",
+        "api-eu.braintrust.dev"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "BRAINTRUST_API_KEY"
+      ]
+    },
+    {
       "id": "gitlab",
       "name": "GitLab",
       "category": "code",
@@ -1211,6 +1452,23 @@
         "format": "{key}"
       },
       "envVars": []
+    },
+    {
+      "id": "clerk",
+      "name": "Clerk",
+      "category": "infrastructure",
+      "docs": "https://clerk.com/docs/reference/backend-api",
+      "note": "The Backend API with a secret key; publishable keys aren't secrets and stay as they are.",
+      "hosts": [
+        "api.clerk.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "CLERK_SECRET_KEY"
+      ]
     },
     {
       "id": "notion",
@@ -1264,6 +1522,25 @@
       ]
     },
     {
+      "id": "intercom",
+      "name": "Intercom",
+      "category": "messaging",
+      "docs": "https://developers.intercom.com/docs/build-an-integration/learn-more/rest-apis/",
+      "note": "A workspace lives in one region, so its token works on one of the three hosts.",
+      "hosts": [
+        "api.intercom.io",
+        "api.eu.intercom.io",
+        "api.au.intercom.io"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "INTERCOM_API_KEY"
+      ]
+    },
+    {
       "id": "sendgrid",
       "name": "SendGrid",
       "category": "email",
@@ -1295,6 +1572,23 @@
       },
       "envVars": [
         "POSTMARK_SERVER_TOKEN"
+      ]
+    },
+    {
+      "id": "mailerlite",
+      "name": "MailerLite",
+      "category": "email",
+      "docs": "https://developers.mailerlite.com/docs/",
+      "note": "The new API only; the classic API (api.mailerlite.com, X-MailerLite-ApiKey) isn't covered.",
+      "hosts": [
+        "connect.mailerlite.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "MAILERLITE_API_KEY"
       ]
     },
     {
