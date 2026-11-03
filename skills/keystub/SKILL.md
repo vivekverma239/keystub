@@ -28,6 +28,8 @@ curl -fsSL https://raw.githubusercontent.com/vivekverma239/keystub/main/install.
 
 It installs to `~/.local/bin`; if that isn't on the PATH yet, call
 `~/.local/bin/keystub` until the user opens a new terminal.
+Where Node is set up, `npm install -g keystub` installs the same binary
+from npm instead.
 
 ## Rules
 

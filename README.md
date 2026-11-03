@@ -19,6 +19,7 @@ Saved keys ◄── link per service ── Environment ── Project
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vivekverma239/keystub/main/install.sh | sh
+# or: npm install -g keystub    (or run it once: npx keystub@latest init --dry-run)
 # or: go install github.com/vivekverma239/keystub/cmd/keystub@latest
 keystub serve                  # prints the dashboard link with its admin token
 ```
