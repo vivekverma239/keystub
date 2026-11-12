@@ -162,6 +162,27 @@
       ]
     },
     {
+      "id": "groww",
+      "name": "Groww",
+      "category": "trading",
+      "docs": "https://groww.in/trade-api/docs/curl",
+      "note": "Save an access token (they end daily at 6:00 AM IST). A saved TOTP token or API key can only make access tokens (POST /v1/token/api/access), and that call hands the box a real one, which Keystub refuses in requests. The SDK has no base-URL variable: for quick start, set groww.domain to GROWW_BASE_URL after GrowwAPI(GROWW_ACCESS_TOKEN). The live feed (socket-api.groww.in) uses its own socket token and isn't covered.",
+      "hosts": [
+        "api.groww.in"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "GROWW_BASE_URL",
+        "path": "/v1"
+      },
+      "envVars": [
+        "GROWW_ACCESS_TOKEN"
+      ]
+    },
+    {
       "id": "resend",
       "name": "Resend",
       "category": "email",
