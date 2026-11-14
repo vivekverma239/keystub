@@ -1020,6 +1020,9 @@
         "header": "Authorization",
         "format": "Bearer {key}"
       },
+      "baseUrl": {
+        "var": "FIRECRAWL_API_URL"
+      },
       "envVars": [
         "FIRECRAWL_API_KEY"
       ]
@@ -1280,6 +1283,9 @@
       "auth": {
         "header": "X-BB-API-Key",
         "format": "{key}"
+      },
+      "baseUrl": {
+        "var": "BROWSERBASE_BASE_URL"
       },
       "envVars": [
         "BROWSERBASE_API_KEY"
