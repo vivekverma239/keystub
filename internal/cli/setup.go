@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vivekverma239/keystub/internal/agent"
 	"github.com/vivekverma239/keystub/internal/proxy"
 )
 
@@ -60,6 +63,10 @@ type access struct {
 	expiresAt                     *time.Time
 	sandbox                       bool // from KEYSTUB_TOKEN, not made by setup
 	made                          bool // setup made the token just now
+	// A laptop's: the folder, where its access is kept, whether the token
+	// came from there, and a nearly expired one to revoke when replaced.
+	folder, store, oldTokenID string
+	cached                    bool
 }
 
 // setVar is one variable setup writes, and why.
@@ -172,15 +179,12 @@ func (c *ctx) setup(args []string) error {
 	if tok := strings.TrimSpace(c.Getenv("KEYSTUB_TOKEN")); tok != "" {
 		a, err = c.sandboxAccess(tok, named)
 	} else {
-		a, err = c.laptopAccess(named, file, p.flags["ttl"], res.DryRun)
+		a, err = c.laptopAccess(named, file)
 	}
 	if err != nil {
 		return err
 	}
 	res.Env = a.env
-	if a.tokenID != "" || a.tokenName != "" {
-		res.Token = setupToken{ID: a.tokenID, Name: a.tokenName, ExpiresAt: a.expiresAt, Made: a.made}
-	}
 	clis := a.sandbox
 	if p.has("cli") {
 		clis = true
@@ -188,22 +192,48 @@ func (c *ctx) setup(args []string) error {
 	if p.has("no-cli") {
 		clis = false
 	}
+	values := map[string]string{}
+	if _, err := os.Stat(file); err == nil {
+		if _, values, err = dotenvNames(file); err != nil {
+			return err
+		}
+	}
+	managed := c.managedVars(file)
 
-	if res.DryRun && a.token == "" {
-		// A laptop with no token yet: name what the environment links,
-		// without making a token to ask the edge with.
+	if a.token == "" {
+		// A laptop with no token for this folder yet: name what the
+		// environment links, and ask before replacing real values, before
+		// a token is made.
 		if err := c.plannedVars(a.env, &res); err != nil {
 			return err
 		}
-		res.NextSteps = []string{"keystub setup " + shellQuote(a.env) + " --env-file " + shellQuote(file) + "   (makes a token for this folder and writes " + file + ")"}
-		return c.emit(res, func(w io.Writer) { c.printSetup(w, res) })
+		if res.DryRun {
+			res.NextSteps = []string{"keystub setup " + shellQuote(a.env) + " --env-file " + shellQuote(file) + "   (makes a token for this folder and writes " + file + ")"}
+			return c.emit(res, func(w io.Writer) { c.printSetup(w, res) })
+		}
+		if err := c.askToReplace(res.Set, values, "", managed, file); err != nil {
+			return err
+		}
+		res.Set = []setVar{}
+		if err := c.makeLaptopToken(a, p.flags["ttl"]); err != nil {
+			return err
+		}
 	}
 
-	cat, err := c.edgeCatalog(a.edge, a.token)
+	cat, err := c.edgeCatalog(a)
+	var refused *Error
+	if a.cached && !res.DryRun && errors.As(err, &refused) && refused.Code == ExitNoAuth {
+		// The folder's kept token was revoked: make a new one.
+		_ = os.Remove(a.store)
+		if err = c.makeLaptopToken(a, p.flags["ttl"]); err == nil {
+			cat, err = c.edgeCatalog(a)
+		}
+	}
 	if err != nil {
 		return err
 	}
-	if a.tokenName == "" {
+	res.Token = setupToken{ID: a.tokenID, Name: a.tokenName, ExpiresAt: a.expiresAt, Made: a.made}
+	if res.Token.Name == "" {
 		res.Token = setupToken{ID: cat.Token.ID, Name: cat.Token.Name, ExpiresAt: cat.Token.ExpiresAt, Made: a.made}
 	}
 	if res.Env == "" {
@@ -237,37 +267,20 @@ func (c *ctx) setup(args []string) error {
 	if err := noClash(vars); err != nil {
 		return err
 	}
-
-	// Which variables already hold what setup would write.
-	values := map[string]string{}
-	if _, err := os.Stat(file); err == nil {
-		if _, values, err = dotenvNames(file); err != nil {
-			return err
-		}
-	}
-	var overwrite []string
 	for i := range vars {
 		cur, ok := values[vars[i].Name]
 		vars[i].current = ok && cur == vars[i].value
-		if ok && !vars[i].current && strings.TrimSpace(cur) != "" && !fromKeystub(cur, a.edge) {
-			overwrite = append(overwrite, vars[i].Name)
-		}
 	}
+	sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
 	res.Set = vars
-	sort.Slice(res.Set, func(i, j int) bool { return res.Set[i].Name < res.Set[j].Name })
 	if clis {
 		res.CLIs = c.cliPlan(vars)
 	}
-
 	if res.DryRun {
 		return c.emit(res, func(w io.Writer) { c.printSetup(w, res) })
 	}
-	if len(overwrite) > 0 {
-		// The file holds real values setup would replace: say so first. A
-		// copy is kept either way.
-		if err := c.confirm(fmt.Sprintf("Replace %s in %s with what Keystub gives (the file is copied to %s first)", strings.Join(overwrite, ", "), file, c.backupDir())); err != nil {
-			return err
-		}
+	if err := c.askToReplace(vars, values, a.edge, managed, file); err != nil {
+		return err
 	}
 	for path, content := range files {
 		if err := writePrivate(path, content); err != nil {
@@ -289,6 +302,9 @@ func (c *ctx) setup(args []string) error {
 		if err := setDotenv(file, ev); err != nil {
 			return fmt.Errorf("writing %s: %w", file, err)
 		}
+	}
+	if err := c.keepManaged(file, vars); err != nil {
+		return err
 	}
 	if !a.sandbox {
 		if err := writeProjectFile(filepath.Dir(file), a.env); err != nil {
@@ -314,16 +330,17 @@ func (c *ctx) sandboxAccess(tok, named string) (*access, error) {
 	if edge == "" {
 		return nil, usageErr("KEYSTUB_TOKEN is set but KEYSTUB_EDGE isn't: set it to the edge URL shown with the token (keystub tokens create … --delivery)")
 	}
-	if !strings.HasPrefix(edge, "https://") && !strings.HasPrefix(edge, "http://127.0.0.1") && !strings.HasPrefix(edge, "http://localhost") {
-		return nil, usageErr("KEYSTUB_EDGE must be an https:// URL")
+	u, err := url.Parse(edge)
+	if err != nil || u.Host == "" || u.User != nil || !(u.Scheme == "https" || (u.Scheme == "http" && loopbackHost(u.Hostname()))) {
+		return nil, usageErr("KEYSTUB_EDGE must be an https:// URL (plain http only to this machine)")
 	}
 	return &access{env: named, edge: edge, token: tok, deliveryKey: strings.TrimSpace(c.Getenv("KEYSTUB_DELIVERY_KEY")), sandbox: true}, nil
 }
 
-// laptopAccess is this folder's token for the environment, made with the
-// person's sign-in the first time and kept for the next run. A dry run
-// makes nothing: it returns the access with no token when there's none.
-func (c *ctx) laptopAccess(named, file, ttl string, dryRun bool) (*access, error) {
+// laptopAccess is this folder's saved access to the environment, or one
+// with no token yet (makeLaptopToken makes it), checking the environment
+// exists. Nothing is made here.
+func (c *ctx) laptopAccess(named, file string) (*access, error) {
 	env := named
 	if env == "" {
 		env = readProjectFile(filepath.Dir(file))
@@ -331,20 +348,21 @@ func (c *ctx) laptopAccess(named, file, ttl string, dryRun bool) (*access, error
 	if env == "" {
 		env = defaultEnv(file)
 	}
-	path, err := envPath(env)
-	if err != nil {
+	if _, err := envPath(env); err != nil {
 		return nil, err
 	}
 	folder, err := filepath.Abs(filepath.Dir(file))
 	if err != nil {
 		return nil, err
 	}
-	store := c.accessPath(env, folder)
+	a := &access{env: env, folder: folder, store: c.accessPath(env, folder)}
 	var saved accessFile
-	if b, err := os.ReadFile(store); err == nil && json.Unmarshal(b, &saved) == nil &&
-		sameServer(saved.Server, c.server) && saved.Env == env && saved.Token != "" &&
-		(saved.ExpiresAt == nil || time.Until(*saved.ExpiresAt) > time.Hour) {
-		return &access{env: env, edge: saved.Edge, token: saved.Token, deliveryKey: saved.DeliveryKey, tokenID: saved.TokenID, expiresAt: saved.ExpiresAt}, nil
+	if b, err := os.ReadFile(a.store); err == nil && json.Unmarshal(b, &saved) == nil && sameServer(saved.Server, c.server) && saved.Env == env && saved.Token != "" {
+		if saved.ExpiresAt == nil || time.Until(*saved.ExpiresAt) > time.Hour {
+			a.edge, a.token, a.deliveryKey, a.tokenID, a.expiresAt, a.cached = saved.Edge, saved.Token, saved.DeliveryKey, saved.TokenID, saved.ExpiresAt, true
+			return a, nil
+		}
+		a.oldTokenID = saved.TokenID // nearly expired: replaced, and revoked
 	}
 	if _, err := c.credential(); err != nil {
 		return nil, err
@@ -355,50 +373,76 @@ func (c *ctx) laptopAccess(named, file, ttl string, dryRun bool) (*access, error
 	if err := c.call("GET", "/api/environments", nil, &es); err != nil {
 		return nil, err
 	}
-	found := false
 	for _, e := range es.Environments {
-		found = found || e.ID == env
+		if e.ID == env {
+			return a, nil
+		}
 	}
-	if !found {
-		return nil, &Error{Code: ExitNotFound, Message: fmt.Sprintf("there's no environment %s yet: run keystub init first, which makes it from this folder", env)}
+	return nil, &Error{Code: ExitNotFound, Message: fmt.Sprintf("there's no environment %s yet: run keystub init first, which makes it from this folder", env)}
+}
+
+// makeLaptopToken makes the folder's token and keeps it, revoking the one
+// it replaces. The name carries a hash of the folder, so two folders of
+// the same name on one machine don't share it.
+func (c *ctx) makeLaptopToken(a *access, ttl string) error {
+	path, _ := envPath(a.env)
+	if ttl == "" {
+		ttl = "7d"
 	}
-	if dryRun {
-		return &access{env: env}, nil
+	host := c.Hostname
+	if host == "" {
+		host = "setup"
 	}
+	sum := sha256.Sum256([]byte(a.folder))
+	name := host + "/" + filepath.Base(a.folder) + "-" + hex.EncodeToString(sum[:2])
+	if a.oldTokenID != "" {
+		// Best effort: an old token that's gone already is fine.
+		_ = c.call("POST", "/api/tokens/"+url.PathEscape(a.oldTokenID)+"/revoke", nil, nil)
+		a.oldTokenID = ""
+	}
+	made, err := c.makeAccess(path, map[string]any{"name": name, "ttl": ttl})
+	if err != nil {
+		return err
+	}
+	saved := accessFile{Server: c.server, Env: a.env, Edge: made.edge, TokenID: made.ID, Token: made.Secret, DeliveryKey: made.deliveryKey, ExpiresAt: made.ExpiresAt}
+	b, _ := json.MarshalIndent(saved, "", "  ")
+	if err := writePrivate(a.store, string(b)+"\n"); err != nil {
+		return &Error{Code: ExitError, Message: fmt.Sprintf("made token %s but couldn't keep it (%v); revoke it: keystub tokens revoke %s --yes", made.ID, err, made.ID)}
+	}
+	a.edge, a.token, a.deliveryKey, a.tokenID, a.tokenName, a.expiresAt, a.made, a.cached = made.edge, made.Secret, made.deliveryKey, made.ID, made.Name, made.ExpiresAt, true, false
+	return nil
+}
+
+// madeAccess is a token made with a delivery key, and the edge to use it at.
+type madeAccess struct {
+	token
+	deliveryKey, edge string
+}
+
+// makeAccess makes an environment token with a delivery key: a laptop's
+// (setup) or a sandbox's (tokens create --delivery).
+func (c *ctx) makeAccess(path string, body map[string]any) (madeAccess, error) {
 	var st struct {
 		EdgeURL string `json:"edgeUrl"`
 	}
 	if err := c.call("GET", path+"/setup", nil, &st); err != nil {
-		return nil, err
+		return madeAccess{}, err
 	}
 	edge := strings.TrimSuffix(st.EdgeURL, "/")
 	if edge == "" {
-		return nil, &Error{Code: ExitError, Message: "the server has no edge to set up against"}
+		return madeAccess{}, &Error{Code: ExitError, Message: "the server has no edge to set up against"}
 	}
-	if ttl == "" {
-		ttl = "7d"
-	}
-	name := c.Hostname
-	if name == "" {
-		name = "setup"
-	}
-	name += "/" + filepath.Base(folder)
+	body["delivery"] = true
 	var out struct {
 		Token struct {
 			token
 			DeliveryKey string `json:"deliveryKey"`
 		} `json:"token"`
 	}
-	if err := c.call("POST", path+"/tokens", map[string]any{"name": name, "ttl": ttl, "delivery": true}, &out); err != nil {
-		return nil, err
+	if err := c.call("POST", path+"/tokens", body, &out); err != nil {
+		return madeAccess{}, err
 	}
-	t := out.Token
-	saved = accessFile{Server: c.server, Env: env, Edge: edge, TokenID: t.ID, Token: t.Secret, DeliveryKey: t.DeliveryKey, ExpiresAt: t.ExpiresAt}
-	b, _ := json.MarshalIndent(saved, "", "  ")
-	if err := writePrivate(store, string(b)+"\n"); err != nil {
-		return nil, &Error{Code: ExitError, Message: fmt.Sprintf("made token %s but couldn't keep it (%v); revoke it: keystub tokens revoke %s --yes", t.ID, err, t.ID)}
-	}
-	return &access{env: env, edge: edge, token: t.Secret, deliveryKey: t.DeliveryKey, tokenID: t.ID, tokenName: t.Name, expiresAt: t.ExpiresAt, made: true}, nil
+	return madeAccess{token: out.Token.token, deliveryKey: out.Token.DeliveryKey, edge: edge}, nil
 }
 
 // accessPath is where a folder's access to env is kept.
@@ -409,30 +453,26 @@ func (c *ctx) accessPath(env, folder string) string {
 
 // --- what goes on the box ---
 
-// edgeCatalog asks the edge which services the token may use.
-func (c *ctx) edgeCatalog(edge, token string) (proxy.CatalogResponse, error) {
-	var out proxy.CatalogResponse
-	req, err := http.NewRequest("GET", edge+"/catalog", nil)
+// edgeCatalog asks the edge which services the token may use, cleaned as
+// keystub run cleans it.
+func (c *ctx) edgeCatalog(a *access) (proxy.CatalogResponse, error) {
+	u, err := url.Parse(a.edge)
 	if err != nil {
-		return out, err
+		return proxy.CatalogResponse{}, err
 	}
-	req.Header.Set(proxy.TokenHeader, token)
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return out, fmt.Errorf("can't reach the edge at %s: %v", edge, unwrapURLError(err))
+	rt := c.Client.Transport
+	if rt == nil {
+		rt = http.DefaultTransport
 	}
-	defer resp.Body.Close()
-	b, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return out, &Error{Code: ExitNoAuth, Message: "the edge refused the token: it expired or was revoked. Ask for a new access, or on a laptop run keystub setup again after deleting " + filepath.Join(c.Home, "access")}
+	cat, err := agent.FetchCatalog(context.Background(), rt, u, a.token)
+	if errors.Is(err, agent.ErrTokenRefused) {
+		msg := "the edge refused this folder's token: it expired or was revoked"
+		if a.sandbox {
+			msg = "the edge refused KEYSTUB_TOKEN: it expired or was revoked; ask for a new access"
+		}
+		return cat, &Error{Code: ExitNoAuth, Message: msg}
 	}
-	if resp.StatusCode != http.StatusOK {
-		return out, answerError(resp.StatusCode, b)
-	}
-	if err := json.Unmarshal(b, &out); err != nil {
-		return out, fmt.Errorf("the edge's catalog isn't valid: %w", err)
-	}
-	return out, nil
+	return cat, err
 }
 
 // standIns are the base URLs and stand-in keys for the services the token
@@ -542,6 +582,69 @@ func (c *ctx) delivered(b bundle, env string, files map[string]string, res *setu
 		out = append(out, setVar{Name: v.Name, Service: v.Service, Protection: prot, value: value, secret: v.Secret})
 	}
 	return out, nil
+}
+
+// askToReplace asks once before setup replaces a value in the file that
+// isn't one it wrote: a real key or secret the person put there. A value
+// setup wrote before (a stand-in, an edge URL, a secret it delivered, which
+// may have changed since) needs no yes.
+func (c *ctx) askToReplace(vars []setVar, values map[string]string, edge string, managed map[string]bool, file string) error {
+	var real []string
+	for _, v := range vars {
+		cur, ok := values[v.Name]
+		if !ok || strings.TrimSpace(cur) == "" || managed[v.Name] || (v.value != "" && cur == v.value) || fromKeystub(cur, edge) {
+			continue
+		}
+		real = append(real, v.Name)
+	}
+	if len(real) == 0 {
+		return nil
+	}
+	if err := c.confirm(fmt.Sprintf("Replace %s in %s with what Keystub gives (the file is copied to %s first)", strings.Join(real, ", "), file, c.backupDir())); err != nil {
+		return err
+	}
+	c.yes = true // asked once
+	return nil
+}
+
+// managedPath is where setup keeps the names it wrote into a dotenv file.
+func (c *ctx) managedPath(file string) string {
+	abs, err := filepath.Abs(file)
+	if err != nil {
+		abs = file
+	}
+	sum := sha256.Sum256([]byte(abs))
+	return filepath.Join(c.Home, "managed", hex.EncodeToString(sum[:8])+".json")
+}
+
+// managedVars are the variables setup wrote into file before.
+func (c *ctx) managedVars(file string) map[string]bool {
+	out := map[string]bool{}
+	var m struct {
+		Names []string `json:"names"`
+	}
+	if b, err := os.ReadFile(c.managedPath(file)); err == nil && json.Unmarshal(b, &m) == nil {
+		for _, n := range m.Names {
+			out[n] = true
+		}
+	}
+	return out
+}
+
+// keepManaged adds the variables just written to file's list.
+func (c *ctx) keepManaged(file string, vars []setVar) error {
+	all := c.managedVars(file)
+	for _, v := range vars {
+		all[v.Name] = true
+	}
+	names := make([]string, 0, len(all))
+	for n := range all {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	abs, _ := filepath.Abs(file)
+	b, _ := json.MarshalIndent(map[string]any{"file": abs, "names": names}, "", "  ")
+	return writePrivate(c.managedPath(file), string(b)+"\n")
 }
 
 // noClash refuses two services setting one variable.
@@ -822,38 +925,21 @@ func (c *ctx) printQuickStart(env string) error {
 // createAccess is tokens create --delivery: a token and its delivery key,
 // printed as the three variables a sandbox runs keystub setup with.
 func (c *ctx) createAccess(path string, body map[string]any) error {
-	var st struct {
-		EdgeURL string `json:"edgeUrl"`
-	}
-	if err := c.call("GET", path+"/setup", nil, &st); err != nil {
+	t, err := c.makeAccess(path, body)
+	if err != nil {
 		return err
 	}
-	edge := strings.TrimSuffix(st.EdgeURL, "/")
-	if edge == "" {
-		return &Error{Code: ExitError, Message: "the server has no edge for a sandbox to set up against"}
-	}
-	body["delivery"] = true
-	var out struct {
-		Token struct {
-			token
-			DeliveryKey string `json:"deliveryKey"`
-		} `json:"token"`
-	}
-	if err := c.call("POST", path+"/tokens", body, &out); err != nil {
-		return err
-	}
-	t := out.Token
-	if t.DeliveryKey == "" {
+	if t.deliveryKey == "" {
 		fmt.Fprintln(c.Stderr, "keystub: warning: this server made no delivery key, so the sandbox gets stand-ins only")
 	}
 	if c.json {
-		return c.emit(map[string]any{"token": t.token, "deliveryKey": t.DeliveryKey, "edge": edge}, nil)
+		return c.emit(map[string]any{"token": t.token, "deliveryKey": t.deliveryKey, "edge": t.edge}, nil)
 	}
 	fmt.Fprintln(c.Stdout, "KEYSTUB_TOKEN="+t.Secret)
-	if t.DeliveryKey != "" {
-		fmt.Fprintln(c.Stdout, "KEYSTUB_DELIVERY_KEY="+t.DeliveryKey)
+	if t.deliveryKey != "" {
+		fmt.Fprintln(c.Stdout, "KEYSTUB_DELIVERY_KEY="+t.deliveryKey)
 	}
-	fmt.Fprintln(c.Stdout, "KEYSTUB_EDGE="+edge)
+	fmt.Fprintln(c.Stdout, "KEYSTUB_EDGE="+t.edge)
 	fmt.Fprintf(c.Stderr, "Access %s for %s (id %s, expires %s). Put these three in the sandbox's environment, then run keystub setup there. They aren't shown again.\n", t.Name, t.Env, t.ID, when(t.ExpiresAt))
 	return nil
 }

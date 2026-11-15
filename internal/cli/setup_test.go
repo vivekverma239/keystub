@@ -50,17 +50,20 @@ func TestSetupOnALaptop(t *testing.T) {
 		t.Fatalf("a dry run made a token: %v", toks)
 	}
 
-	// The file holds the real key, so setup asks first.
+	// The file holds the real key, so setup asks first, before it makes a
+	// token.
 	if res := r.run("", "setup", "--env-file", path, "--json"); res.code != ExitUsage || !strings.Contains(res.stdout, "OPENAI_API_KEY") {
 		t.Fatalf("setup over a real key without --yes: %d %s", res.code, res.stdout)
+	}
+	if toks := r.must("", "tokens", "list", "shop/dev", "--json").json(t)["tokens"].([]any); len(toks) != 0 {
+		t.Fatalf("setup made a token before the yes: %v", toks)
 	}
 	res := r.must("", "setup", "--env-file", path, "--yes", "--json")
 	if strings.Contains(res.stdout+res.stderr, "sk-stub-") || strings.Contains(res.stdout, "sk-real") {
 		t.Fatal("setup printed a value")
 	}
 	out := res.json(t)
-	// The token was made by the run that asked, and kept for this one.
-	if out["backup"] == nil || out["token"].(map[string]any)["name"] != "testbox/shop" {
+	if tn, _ := out["token"].(map[string]any)["name"].(string); out["backup"] == nil || out["token"].(map[string]any)["made"] != true || !strings.HasPrefix(tn, "testbox/shop-") {
 		t.Fatalf("result %v", out)
 	}
 	text := readFile(t, path)
@@ -84,6 +87,21 @@ func TestSetupOnALaptop(t *testing.T) {
 	if toks := r.must("", "tokens", "list", "shop/dev", "--json").json(t)["tokens"].([]any); len(toks) != 1 {
 		t.Fatalf("tokens after two setups: %d", len(toks))
 	}
+	if again["token"].(map[string]any)["id"] == nil {
+		t.Fatalf("second setup has no token id: %v", again)
+	}
+	// A revoked token is replaced, once, with a new one.
+	id := again["token"].(map[string]any)["id"].(string)
+	r.must("", "tokens", "revoke", id, "--yes", "--json")
+	third := r.must("", "setup", "--env-file", path, "--json").json(t)
+	if third["token"].(map[string]any)["made"] != true || third["token"].(map[string]any)["id"] == id {
+		t.Fatalf("after revoking: %v", third)
+	}
+	tok = strings.TrimPrefix(dotenvLine(readFile(t, path), "OPENAI_API_KEY"), "OPENAI_API_KEY=")
+	if code, _ := r.call("openai", tok); code != 200 {
+		t.Fatalf("new stand-in through the edge: %d", code)
+	}
+
 	// Its access file is the owner's alone.
 	entries, _ := os.ReadDir(filepath.Join(r.home, "access"))
 	if len(entries) != 1 {
@@ -227,6 +245,22 @@ func TestSetupInASandbox(t *testing.T) {
 	if n := strings.Count(readFile(t, filepath.Join(home, ".profile")), profileLine); n != 1 {
 		t.Fatalf("profile line %d times", n)
 	}
+
+	// A secret setup delivered before changed (rotated): replaced with no yes.
+	write(t, path, strings.Replace(readFile(t, path), "postgres://u:p@db/app", "postgres://u:old@db/app", 1))
+	r.must("", "setup", "--env-file", path, "--json")
+	if !strings.Contains(readFile(t, path), "DATABASE_URL=postgres://u:p@db/app") {
+		t.Fatal("the rotated secret wasn't replaced")
+	}
+
+	// Plain http to anything but this machine is refused.
+	for _, bad := range []string{"http://localhost.evil.example", "http://127.0.0.1.nip.io", "http://edge.example.com", "https://user:pw@edge.example.com"} {
+		r.env["KEYSTUB_EDGE"] = bad
+		if res := r.run("", "setup", "--env-file", path, "--json"); res.code != ExitUsage {
+			t.Fatalf("KEYSTUB_EDGE=%s: %d %s", bad, res.code, res.stdout)
+		}
+	}
+	r.env["KEYSTUB_EDGE"] = edge.URL
 
 	// A token for another environment, a wrong delivery key, no edge.
 	if res := r.run("", "setup", "other/dev", "--env-file", path, "--json"); res.code != ExitUsage {

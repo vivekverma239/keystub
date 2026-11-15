@@ -189,18 +189,7 @@ func isPostgresURL(v string) bool {
 // localSlug is the server's slug of a name, for naming a service before
 // it's made: lower case, runs of anything else one dash.
 func localSlug(name string) string {
-	var b strings.Builder
-	dash := false
-	for _, r := range strings.ToLower(name) {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			b.WriteRune(r)
-			dash = false
-		} else if !dash && b.Len() > 0 {
-			b.WriteByte('-')
-			dash = true
-		}
-	}
-	return strings.TrimSuffix(b.String(), "-")
+	return strings.Trim(slugUnsafe.ReplaceAllString(strings.ToLower(name), "-"), "-")
 }
 
 // inCatalog says whether id is a catalog service (Postgres), which is

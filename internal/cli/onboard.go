@@ -251,7 +251,7 @@ func (c *ctx) initEnv(args []string) error {
 		if k := pickKey(keys, st.Service, st.Key, named || r.secret); k != nil {
 			// A saved key to link: the file's value isn't read, so it may be
 			// empty (a copied .env.example) or anything else.
-			st.SaveKey, st.Key, st.Shared = false, k.Name, !strings.EqualFold(k.Name, plan.KeyName)
+			st.SaveKey, st.Key, st.Shared = false, k.Name, !r.secret && !strings.EqualFold(k.Name, plan.KeyName)
 		} else {
 			reason := ""
 			switch {
