@@ -373,7 +373,7 @@ func TestUsageSetupAndCA(t *testing.T) {
 	r.must("", "services", "add", "openai")
 	r.must("k", "keys", "add", "openai", "--name", "team")
 	r.must("", "envs", "link", core.DefaultEnv, "openai", "team", "--no-token")
-	setup := r.must("", "setup", core.DefaultEnv, "--json").json(t)
+	setup := r.must("", "setup", core.DefaultEnv, "--print", "--json").json(t)
 	lines, _ := setup["envLines"].([]any)
 	joined := ""
 	for _, l := range lines {

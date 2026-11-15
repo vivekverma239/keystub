@@ -24,13 +24,15 @@ curl -fsSL https://raw.githubusercontent.com/vivekverma239/keystub/main/install.
 keystub serve                  # prints the dashboard link with its admin token
 ```
 
-With a coding agent, ask it to set Keystub up for the project: the [skill](#the-skill-for-coding-agents) has it run `keystub init --dry-run`, show you the plan, and change nothing until you agree. By hand, in a folder with a `.env`:
+With a coding agent, ask it to set Keystub up for the project: the [skill](#the-skill-for-coding-agents) has it run `keystub init --dry-run`, show you the plan, and change nothing until you agree. By hand, in the project's folder (with a `.env`, a `.env.example`, or neither: then init reads the variables the code uses):
 
 ```bash
-keystub init --dry-run     # what it would do; then keystub init to do it
-keystub init --write-env --base-urls   # also a token in .env in place of the real keys (asks; keeps a copy in ~/.keystub/backups)
+keystub init --dry-run     # what it would save: keys and secrets; then keystub init to do it
+keystub setup              # .env gets stand-ins in place of the real keys, and the secrets (asks; keeps a copy in ~/.keystub/backups)
 keystub doctor             # checks the setup and the token
 ```
+
+In a sandbox or CI job, make an access on your machine with `keystub tokens create my-app/dev --name ci --ttl 1d --delivery`, put its three variables (`KEYSTUB_TOKEN`, `KEYSTUB_DELIVERY_KEY`, `KEYSTUB_EDGE`) in the sandbox's environment, and run `keystub setup` there: it writes `.env`, exports the same variables from `~/.keystub/env.sh` for shells and CLIs, and points gcloud at its short-lived token.
 
 Open the printed link, add a service (OpenAI, Anthropic, GitHub, Stripe, Resend, Cloudflare, Vercel, or any name and hosts), and paste its real key (it's saved and linked into `default/dev`). Then:
 

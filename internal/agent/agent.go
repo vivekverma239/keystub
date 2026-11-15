@@ -207,6 +207,10 @@ func CheckRemote(u *url.URL) error {
 	return nil
 }
 
+// ErrTokenRefused is FetchCatalog's error when the edge refuses the token:
+// unknown, revoked or expired.
+var ErrTokenRefused = errors.New("the edge refused the token: it is unknown, revoked or expired")
+
 // FetchCatalog asks the edge which services token may use.
 func FetchCatalog(ctx context.Context, rt http.RoundTripper, edge *url.URL, token string) (proxy.CatalogResponse, error) {
 	var out proxy.CatalogResponse
@@ -233,9 +237,14 @@ func FetchCatalog(ctx context.Context, rt http.RoundTripper, edge *url.URL, toke
 			} `json:"error"`
 		}
 		if json.Unmarshal(body, &e) == nil && e.Error.Message != "" {
-			return out, fmt.Errorf("the edge refused: %s", printable(strings.TrimPrefix(e.Error.Message, "keystub: ")))
+			err = fmt.Errorf("the edge refused: %s", printable(strings.TrimPrefix(e.Error.Message, "keystub: ")))
+		} else {
+			err = fmt.Errorf("GET %s/catalog: %s", edge.Host, printable(resp.Status))
 		}
-		return out, fmt.Errorf("GET %s/catalog: %s", edge.Host, printable(resp.Status))
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			err = fmt.Errorf("%w: %w", ErrTokenRefused, err)
+		}
+		return out, err
 	}
 	if err := json.Unmarshal(body, &out); err != nil {
 		return out, fmt.Errorf("the edge's catalog isn't valid: %w", err)

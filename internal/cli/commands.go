@@ -93,6 +93,10 @@ type service struct {
 		Var  string `json:"var"`
 		Path string `json:"path"`
 	} `json:"baseUrl"`
+	// A hosted server's delivered services: kind is minted or secret, and
+	// variables are what it is delivered as.
+	Kind      string   `json:"kind"`
+	Variables []string `json:"variables"`
 }
 
 // varNames are the names of a service's key variables, without templates.
@@ -741,7 +745,7 @@ func zeroIfNil(l *limits) *limits {
 // --- tokens ---
 
 const tokensUsage = `tokens create PROJECT/ENV --name NAME [--ttl 2h] [--service S] [--daily N] [--per-minute N]
-                       [--write-env FILE [--base-urls]]
+                       [--write-env FILE [--base-urls] | --delivery]
        keystub tokens list PROJECT/ENV
        keystub tokens revoke TOKEN_ID --yes`
 
@@ -752,7 +756,7 @@ func (c *ctx) tokens(args []string) error {
 	sub, args := args[0], args[1:]
 	switch sub {
 	case "create":
-		p, err := parse(args, []string{"name", "ttl", "service", "daily", "per-minute", "write-env"}, []string{"base-urls"})
+		p, err := parse(args, []string{"name", "ttl", "service", "daily", "per-minute", "write-env"}, []string{"base-urls", "delivery"})
 		if err != nil {
 			return err
 		}
@@ -776,6 +780,9 @@ func (c *ctx) tokens(args []string) error {
 		}
 		if p.has("base-urls") && !p.has("write-env") {
 			return usageErr("--base-urls goes with --write-env FILE")
+		}
+		if p.has("delivery") && (p.has("write-env") || p.has("service")) {
+			return usageErr("--delivery makes an access for a sandbox to run keystub setup with: it goes without --write-env and --service")
 		}
 		var plan *tokenFile
 		var backup string
@@ -805,6 +812,9 @@ func (c *ctx) tokens(args []string) error {
 		}
 		if l != nil {
 			body["limits"] = l
+		}
+		if p.has("delivery") {
+			return c.createAccess(path, body)
 		}
 		var out struct {
 			Token token `json:"token"`
@@ -1019,41 +1029,6 @@ func toFloat(v any) float64 {
 }
 
 func num(v any) string { return strconv.FormatInt(int64(toFloat(v)), 10) }
-
-func (c *ctx) setup(args []string) error {
-	p, err := parse(args, nil, nil)
-	if err != nil {
-		return err
-	}
-	if err := p.want(1, 1, "setup PROJECT/ENV"); err != nil {
-		return err
-	}
-	path, err := envPath(p.args[0])
-	if err != nil {
-		return err
-	}
-	var out struct {
-		EdgeURL          string   `json:"edgeUrl"`
-		GatewayURL       *string  `json:"gatewayUrl"`
-		EnvLines         []string `json:"envLines"`
-		RemoteProxyLines []string `json:"remoteProxyLines"`
-	}
-	if err := c.call("GET", path+"/setup", nil, &out); err != nil {
-		return err
-	}
-	return c.emit(out, func(w io.Writer) {
-		fmt.Fprintf(w, "# Quick start for %s: SDKs call the edge at %s directly.\n# Replace <token> with a token: keystub tokens create %s --name NAME\n", p.args[0], out.EdgeURL, p.args[0])
-		for _, l := range out.EnvLines {
-			fmt.Fprintln(w, l)
-		}
-		if len(out.RemoteProxyLines) > 0 {
-			fmt.Fprintln(w, "\n# Or send everything through the remote proxy:")
-			for _, l := range out.RemoteProxyLines {
-				fmt.Fprintln(w, l)
-			}
-		}
-	})
-}
 
 func (c *ctx) ca(args []string) error {
 	p, err := parse(args, []string{"o", "output"}, nil)
