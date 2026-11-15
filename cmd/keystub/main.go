@@ -65,6 +65,7 @@ Usage:
 Set Keystub up from the command line (hosted or self-hosted):
   keystub login [--no-browser] | logout | whoami
   keystub init [PROJECT/ENV] [--env-file FILE] [--key-name NAME] [--write-env] [--dry-run]
+  keystub setup [PROJECT/ENV] [--env-file FILE] [--ttl 7d] [--cli|--no-cli] [--dry-run] [--print]
   keystub doctor [PROJECT/ENV] [--env-file FILE]
   keystub services list | add | remove
   keystub keys list | add | scan | show | replace | rename | limits | delete
@@ -72,7 +73,6 @@ Set Keystub up from the command line (hosted or self-hosted):
   keystub envs list | add | limits | delete | link | unlink | links
   keystub tokens create | list | revoke
   keystub usage [PROJECT/ENV] [--by service,token,key] [--range 7d]
-  keystub setup PROJECT/ENV
   keystub ca [-o FILE]
   keystub help agents           a setup guide a coding agent can follow
   keystub version

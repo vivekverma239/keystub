@@ -301,6 +301,8 @@ func checkAPICommand(t *testing.T, cmd string, args []string) error {
 				return "skapi_test"
 			case "KEYSTUB_SERVER":
 				return "https://keystub.invalid"
+			case "KEYSTUB_TOKEN", "KEYSTUB_DELIVERY_KEY", "KEYSTUB_EDGE":
+				return "" // a laptop, not a sandbox
 			}
 			return "a-value" // every --from-env VAR is set
 		},

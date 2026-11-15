@@ -69,8 +69,11 @@ func TestInit(t *testing.T) {
 	if b, _ := os.ReadFile(path); string(b) != text {
 		t.Fatalf("init changed the file without --write-env:\n%s", b)
 	}
-	if !strings.Contains(res.stdout, "--write-env") || !strings.Contains(res.stdout, "keystub doctor") {
+	if !strings.Contains(res.stdout, "keystub setup my-app/dev") || !strings.Contains(res.stdout, "keystub doctor") {
 		t.Errorf("next steps: %s", res.stdout)
+	}
+	if readProjectFile(filepath.Dir(path)) != "my-app/dev" {
+		t.Error("init wrote no .keystub.json")
 	}
 
 	// Again: nothing left to do, and an existing link is left alone.
@@ -167,8 +170,8 @@ func TestInitLeavesUnclearValues(t *testing.T) {
 	if got, _ := r.engine.RealKey(context.Background(), "app/dev", "openai"); got != "sk-real" {
 		t.Errorf("openai: %q", got)
 	}
-	// The next steps keep the key name.
-	if !strings.Contains(res.stdout, "--key-name work") {
+	// The next step is setup, which needs no key name.
+	if !strings.Contains(res.stdout, "keystub setup app/dev") {
 		t.Errorf("next steps: %s", res.stdout)
 	}
 }

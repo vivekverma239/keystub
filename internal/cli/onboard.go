@@ -27,10 +27,16 @@ type initStep struct {
 	Shared     bool   `json:"shared"`     // Key is one the account had already, not --key-name
 	Link       bool   `json:"link"`       // the environment doesn't link the service yet
 	LinkedTo   string `json:"linkedTo,omitempty"`
+	// Secret is a value handed to the box as it is (a database URL, a
+	// deploy key), saved for this environment alone, never shared.
+	Secret bool `json:"secret,omitempty"`
+	// Custom is a secret no service reads yet: init makes one for it.
+	Custom bool `json:"custom,omitempty"`
 }
 
 type initPlan struct {
 	File      string     `json:"file"`
+	Source    string     `json:"source"` // file, example (names only) or code (names found in the code)
 	Env       string     `json:"env"`
 	KeyName   string     `json:"keyName"`
 	MakeEnv   bool       `json:"makeEnv"`
@@ -79,6 +85,7 @@ type reader struct {
 	service   service
 	added     bool
 	templated bool
+	secret    bool // a delivered secret's variable (Postgres's DATABASE_URL)
 }
 
 func (c *ctx) readers() (map[string]reader, error) {
@@ -100,6 +107,13 @@ func (c *ctx) readers() (map[string]reader, error) {
 					out[name] = reader{service: s, added: i == 0, templated: hasTmpl && tmpl != "{key}"}
 				}
 			}
+			if s.Kind == "secret" {
+				for _, name := range s.Variables {
+					if _, ok := out[name]; !ok {
+						out[name] = reader{service: s, added: i == 0, secret: true}
+					}
+				}
+			}
 		}
 	}
 	return out, nil
@@ -114,11 +128,23 @@ func (c *ctx) initEnv(args []string) error {
 		return err
 	}
 	file := p.flags["env-file"]
+	src := envSource{Kind: "file"}
 	if file == "" {
-		file = ".env"
+		if src, err = findEnvSource("."); err != nil {
+			return err
+		}
+		file = src.File
+		if file == "" {
+			file = ".env"
+		}
+	} else if src.Names, src.Values, err = dotenvNames(file); err != nil {
+		return err
+	}
+	if src.Kind != "file" && p.has("write-env") {
+		return usageErr("there's no .env to write a token into (init read %s): run keystub setup after init, which writes one", map[string]string{"example": src.File, "code": "the code"}[src.Kind])
 	}
 	named := p.flags["key-name"] != ""
-	plan := initPlan{File: file, KeyName: p.flags["key-name"], WriteEnv: p.has("write-env"), BaseURLs: p.has("base-urls"), DryRun: p.has("dry-run"), Steps: []initStep{}, Skipped: []skipped{}}
+	plan := initPlan{File: file, Source: src.Kind, KeyName: p.flags["key-name"], WriteEnv: p.has("write-env"), BaseURLs: p.has("base-urls"), DryRun: p.has("dry-run"), Steps: []initStep{}, Skipped: []skipped{}}
 	if plan.BaseURLs && !plan.WriteEnv {
 		return usageErr("--base-urls goes with --write-env")
 	}
@@ -133,10 +159,7 @@ func (c *ctx) initEnv(args []string) error {
 	if err != nil {
 		return err
 	}
-	names, values, err := dotenvNames(file)
-	if err != nil {
-		return err
-	}
+	names, values := src.Names, src.Values
 	if plan.WriteEnv {
 		if err := checkWritable(file); err != nil {
 			return err
@@ -146,6 +169,13 @@ func (c *ctx) initEnv(args []string) error {
 	if err != nil {
 		return err
 	}
+	// A server that can hold secrets has a delivered secret in its
+	// catalog (Postgres); a self-hosted one doesn't yet.
+	canSecrets := false
+	for _, r := range reads {
+		canSecrets = canSecrets || r.secret
+	}
+	secretKey := strings.ReplaceAll(plan.Env, "/", "-")
 	keys, err := c.listKeys()
 	if err != nil {
 		return err
@@ -180,8 +210,29 @@ func (c *ctx) initEnv(args []string) error {
 	seen := map[string]bool{}
 	for _, n := range names {
 		r, ok := reads[n]
+		if ok && r.secret && n == "DATABASE_URL" && values[n] != "" && !isPostgresURL(values[n]) {
+			ok = false // a MySQL or SQLite URL: kept as a secret of its own
+		}
+		if !ok && looksSecret(n, values[n]) {
+			if !canSecrets {
+				if strings.TrimSpace(values[n]) != "" {
+					plan.Skipped = append(plan.Skipped, skipped{n, "a secret this server can't hold yet: it stays in the file"})
+				}
+				continue
+			}
+			id := localSlug(n)
+			r, ok = reader{service: service{ID: id, Name: n, Kind: "secret", Variables: []string{n}}, secret: true}, true
+			for _, x := range reads {
+				if x.added && x.service.ID == id {
+					r = x // made by an init of another project: the service, not its value
+				}
+			}
+		}
 		switch {
 		case !ok:
+			if src.Kind == "code" {
+				plan.Skipped = append(plan.Skipped, skipped{n, "read in " + src.FoundIn[n] + "; not a key or secret Keystub knows"})
+			}
 			continue // not a key variable Keystub knows
 		case holdsToken(values[n]):
 			plan.Skipped = append(plan.Skipped, skipped{n, "already a Keystub token"})
@@ -190,22 +241,38 @@ func (c *ctx) initEnv(args []string) error {
 			plan.Skipped = append(plan.Skipped, skipped{n, "another variable already gives the " + r.service.ID + " key"})
 			continue
 		}
-		st := initStep{Service: r.service.ID, Var: n, AddService: !r.added, SaveKey: true, Link: true, Key: plan.KeyName}
-		if k := pickKey(keys, st.Service, plan.KeyName, named); k != nil {
+		st := initStep{Service: r.service.ID, Var: n, AddService: !r.added, SaveKey: true, Link: true, Key: plan.KeyName, Secret: r.secret}
+		if r.secret {
+			// A secret is this environment's own: another project's database
+			// URL is never the one to use.
+			st.Key = secretKey
+			st.Custom = !r.added && r.service.Kind == "secret" && len(r.service.Hosts) == 0 && !inCatalog(reads, r.service.ID)
+		}
+		if k := pickKey(keys, st.Service, st.Key, named || r.secret); k != nil {
 			// A saved key to link: the file's value isn't read, so it may be
 			// empty (a copied .env.example) or anything else.
 			st.SaveKey, st.Key, st.Shared = false, k.Name, !strings.EqualFold(k.Name, plan.KeyName)
 		} else {
 			reason := ""
-			if strings.TrimSpace(values[n]) == "" {
+			switch {
+			case strings.TrimSpace(values[n]) == "" && src.Kind == "code":
+				reason = "read in " + src.FoundIn[n] + " but there's no value: save it with keystub keys add " + st.Service
+			case strings.TrimSpace(values[n]) == "" && src.Kind == "example":
+				reason = "only in " + src.File + ", with no value: save it with keystub keys add " + st.Service
+			case strings.TrimSpace(values[n]) == "":
 				reason = "empty"
-			} else if r.templated {
+			}
+			switch {
+			case reason != "":
+			case r.templated:
 				reason = "the key is inside a template; save it with keystub keys add " + r.service.ID
-			} else if _, err := dotenvValue(file, n); err != nil {
-				// A value dotenv loaders read differently from the file (a
-				// stray # or $, odd quotes) isn't saved: the person fixes
-				// the line first.
-				reason = err.Error()
+			default:
+				if _, err := dotenvValue(file, n); err != nil {
+					// A value dotenv loaders read differently from the file (a
+					// stray # or $, odd quotes) isn't saved: the person fixes
+					// the line first.
+					reason = err.Error()
+				}
 			}
 			if reason != "" {
 				plan.Skipped = append(plan.Skipped, skipped{n, reason})
@@ -275,8 +342,18 @@ func (c *ctx) initEnv(args []string) error {
 		return err
 	}
 
-	for _, st := range plan.Steps {
-		if st.AddService {
+	for i := range plan.Steps {
+		st := &plan.Steps[i]
+		switch {
+		case st.Custom:
+			var out struct {
+				Service service `json:"service"`
+			}
+			if err := c.call("POST", "/api/services", map[string]any{"kind": "secret", "name": st.Var, "variable": st.Var}, &out); err != nil {
+				return fmt.Errorf("adding the secret %s: %w", st.Var, err)
+			}
+			st.Service = out.Service.ID
+		case st.AddService:
 			if err := c.call("POST", "/api/services", map[string]any{"catalog": st.Service}, nil); err != nil {
 				return fmt.Errorf("adding %s: %w", st.Service, err)
 			}
@@ -286,7 +363,7 @@ func (c *ctx) initEnv(args []string) error {
 			if err != nil {
 				return err
 			}
-			body := map[string]any{"service": st.Service, "name": plan.KeyName, "value": strings.TrimSpace(v)}
+			body := map[string]any{"service": st.Service, "name": st.Key, "value": strings.TrimSpace(v)}
 			if err := c.call("POST", "/api/keys", body, nil); err != nil {
 				return fmt.Errorf("saving the %s key: %w", st.Service, err)
 			}
@@ -313,6 +390,9 @@ func (c *ctx) initEnv(args []string) error {
 		if err := c.initWrite(&plan, path); err != nil {
 			return err
 		}
+	}
+	if err := writeProjectFile(filepath.Dir(plan.File), plan.Env); err != nil {
+		return err
 	}
 	plan.NextSteps = c.initNext(plan)
 	return c.emit(plan, func(w io.Writer) {
@@ -420,7 +500,7 @@ func (c *ctx) initNext(plan initPlan) []string {
 		return next
 	}
 	if plan.FileSet == nil && len(plan.Steps) > 0 {
-		next = append(next, fmt.Sprintf("%s --write-env --base-urls --dry-run   (shows which variables a token would replace in %s; only with the person's yes, run it again with --yes in place of --dry-run, which copies the file to %s first)", base, plan.File, c.backupDir()))
+		next = append(next, fmt.Sprintf("keystub setup %s --env-file %s --dry-run   (shows what setup writes into %s: stand-ins for the keys and the secrets; only with the person's yes, run it again without --dry-run, adding --yes when it replaces real keys; the file is copied to %s first)", shellQuote(plan.Env), shellQuote(setupFile(plan)), setupFile(plan), c.backupDir()))
 	}
 	next = append(next, "keystub doctor "+shellQuote(plan.Env)+" --env-file "+shellQuote(plan.File))
 	return next
@@ -433,10 +513,12 @@ func (c *ctx) printPlan(w io.Writer, plan initPlan) {
 	}
 	for _, st := range plan.Steps {
 		var do []string
-		if st.AddService {
+		if st.AddService && !st.Custom {
 			do = append(do, "add the service")
 		}
 		switch {
+		case st.SaveKey && st.Secret:
+			do = append(do, fmt.Sprintf("save %s as a secret of %s alone, handed to the box as it is", st.Var, plan.Env))
 		case st.SaveKey:
 			do = append(do, fmt.Sprintf("save its key from %s as %q", st.Var, plan.KeyName))
 		case st.Shared:
@@ -658,4 +740,13 @@ func (c *ctx) probe(edge, svc, tok string) (status, detail string) {
 		return "warn", fmt.Sprintf("the token works, but %s turned the saved key down (HTTP %d): check it, or replace it with keystub keys replace", svc, resp.StatusCode)
 	}
 	return "ok", fmt.Sprintf("the token works: %s answered through Keystub (HTTP %d)", svc, resp.StatusCode)
+}
+
+// setupFile is the dotenv file setup writes after init: the file init read,
+// unless that was an example or the code, when it's .env beside it.
+func setupFile(plan initPlan) string {
+	if plan.Source == "file" {
+		return plan.File
+	}
+	return filepath.Join(filepath.Dir(plan.File), ".env")
 }

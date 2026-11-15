@@ -94,12 +94,15 @@ in this folder and uses the environment `<folder>/dev`; name others with
 2. On their yes: `keystub init --yes --json`. It adds the services, saves
    each key straight from the file, makes the environment and links the
    keys. The `.env` file isn't changed.
-3. Ask whether to put a token in `.env` in place of the real keys. First
-   `keystub init --write-env --base-urls --dry-run --json`: `writeVars` are
-   the variables it would set (the key variables, and with `--base-urls`
-   each SDK's base URL on the edge); tell the user which. Only on a yes:
-   `keystub init --write-env --base-urls --yes --json`. It answers with
-   the copy of the old file (`backup`); tell the user where it is.
+3. Ask whether to write the stand-ins into `.env` in place of the real
+   keys. First `keystub setup --dry-run --json`: `set` lists the variables
+   it would write, each with its `protection` (`never-on-box`: a base URL
+   and stand-in, the real key stays in Keystub; `short-lived`: a minted
+   credential; `on-box`: a secret as it is); tell the user which. Only on a
+   yes: `keystub setup --yes --json`. It makes a token for this folder
+   (kept in `~/.keystub/access`, never printed) and answers with the copy of
+   the old file (`backup`); tell the user where it is. Running it again
+   reuses the token and refreshes short-lived credentials.
 4. Check it: `keystub doctor --json`. Each check is `ok`, `warn` or
    `fail`, with what to do in `detail`; exit code 1 means one failed.
 
@@ -188,10 +191,16 @@ alone (a key inside a template, a service the catalog doesn't have).
 A proxy token works only on its way through Keystub. Pick one:
 
 - **Base URLs, for SDKs that take one** (OpenAI, Anthropic, Gemini, Groq,
-  OpenRouter and others): `--base-urls` in step 7 writes them, such as
+  OpenRouter and others): `keystub setup` writes them, such as
   `OPENAI_BASE_URL`. This works with the hosted service and with no proxy
-  or CA on the machine. `keystub setup my-app/dev --json` shows the same
-  lines, with `<token>` where the token goes.
+  or CA on the machine. `keystub setup my-app/dev --print --json` shows the
+  same lines, with `<token>` where the token goes.
+- **A sandbox or CI job**: give it an access, made with
+  `keystub tokens create my-app/dev --name ci --ttl 1d --delivery` (three
+  variables: `KEYSTUB_TOKEN`, `KEYSTUB_DELIVERY_KEY`, `KEYSTUB_EDGE`; put
+  them in the sandbox's environment without printing them). There,
+  `keystub setup --json` writes `.env`, exports the same variables from
+  `~/.keystub/env.sh` for shells and CLIs, and points gcloud at its token.
 - **The proxy, for every client** (curl, git, any SDK):
   - On a machine running `keystub serve`, or linked to a server with
     `keystub link`, `keystub run -- npm run dev` gives the command this
@@ -200,7 +209,7 @@ A proxy token works only on its way through Keystub. Pick one:
   - Elsewhere, with a token in `$KEYSTUB_TOKEN`:
     `keystub run --remote https://keystub.example.com -- npm test`
     (a self-hosted server's edge). `--token` also works but shows in `ps`.
-  - Hosted: `keystub setup my-app/dev --json` also returns
+  - Hosted: `keystub setup my-app/dev --print --json` also returns
     `remoteProxyLines` (an `HTTPS_PROXY` and CA settings) when the account
     has a remote proxy; `keystub ca -o keystub-ca.pem --json` saves the CA.
 - `eval "$(keystub env)"` sets the same variables in a shell or `.envrc`.

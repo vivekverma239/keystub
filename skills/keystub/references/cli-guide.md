@@ -23,16 +23,19 @@ The short way, for a project with a .env file:
    curl -fsSL https://raw.githubusercontent.com/vivekverma239/keystub/main/install.sh | sh
    (or, with Node: npm install -g keystub)
    keystub login --server https://app.keystub.app   (opens the browser; approve the code)
-   keystub init --dry-run --json      (the plan: services, keys, the environment; changes nothing)
-   keystub init --yes --json          (after the person agrees: saves the keys from .env, links them)
-   keystub init --write-env --base-urls --dry-run --json
-                                      (the variables a token would replace in .env; "writeVars")
-   keystub init --write-env --base-urls --yes --json
-                                      (only if the person agrees: a token in .env in place of
-                                       the real keys, and each SDK's base URL on the edge)
+   keystub init --dry-run --json      (the plan: services, keys, secrets, the environment; changes nothing)
+   keystub init --yes --json          (after the person agrees: saves the keys and secrets, links them)
+   keystub setup --dry-run --json     (what setup would write into .env; "set", each with its protection)
+   keystub setup --yes --json         (only if the person agrees: stand-ins in .env in place of
+                                       the real keys, each SDK's base URL on the edge, and the
+                                       secrets; a token for this folder, kept, never printed)
    keystub doctor --json              (checks sign-in, links, the .env file, and the token)
-   init and doctor read .env in this folder and use the environment
-   <folder>/dev; name others with --env-file FILE and PROJECT/ENV. For a
+   init reads .env in this folder (else .env.local, else the names in
+   .env.example, else the variables the code reads) and uses the
+   environment <folder>/dev, which it writes to .keystub.json for setup and
+   doctor; name others with --env-file FILE and PROJECT/ENV. A variable no
+   service reads but that holds a secret (a database URL, a deploy key) is
+   saved as that environment's own secret, never shared with another. For a
    service the account already has a saved key for (a teammate's), init links
    that key, the one linked most, and doesn't save the file's; otherwise it
    saves the file's as "personal". --key-name NAME uses or saves that name
@@ -81,7 +84,13 @@ The steps below do the same one at a time.
    through Keystub, either through its proxy:
    keystub run --token "$TOKEN" -- npm test
    or, for SDKs with a base-URL setting, straight to the edge:
-   keystub setup my-app/dev      (prints the .env lines; put the token in them)
+   keystub setup my-app/dev --print   (prints the .env lines; put the token in them)
+
+In a sandbox or CI job:
+   keystub tokens create my-app/dev --name ci --ttl 1d --delivery
+                                      (on your machine: KEYSTUB_TOKEN, KEYSTUB_DELIVERY_KEY and
+                                       KEYSTUB_EDGE, for the sandbox's environment)
+   keystub setup --json               (in the sandbox: writes .env, ~/.keystub/env.sh, gcloud)
 
 Later:
 - Rotate a key everywhere it is linked: keystub keys replace team --service openai --from-env NEW_KEY
