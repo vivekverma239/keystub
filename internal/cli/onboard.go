@@ -110,6 +110,11 @@ func (c *ctx) readers() (map[string]reader, error) {
 			}
 			if s.Kind == "secret" || s.Kind == "minted" {
 				for _, name := range s.Variables {
+					// A minted service's plain settings (AWS_REGION, a project)
+					// say nothing about a key: only its credential names count.
+					if s.Kind == "minted" && !looksSecret(name, "") {
+						continue
+					}
 					if _, ok := out[name]; !ok {
 						out[name] = reader{service: s, added: i == 0, secret: s.Kind == "secret", minted: s.Kind == "minted"}
 					}
