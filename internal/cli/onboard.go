@@ -87,6 +87,10 @@ type reader struct {
 	templated bool
 	secret    bool // a delivered secret's variable (Postgres's DATABASE_URL)
 	minted    bool // a minted service's variable (AWS's AWS_ACCESS_KEY_ID): never saved from the file
+	// mintedAlt is a minted service that reads the same variable as this
+	// stand-in (Fly.io's FLY_API_TOKEN): init links it instead when the
+	// account has a key saved for it.
+	mintedAlt *reader
 }
 
 func (c *ctx) readers() (map[string]reader, error) {
@@ -115,8 +119,12 @@ func (c *ctx) readers() (map[string]reader, error) {
 					if s.Kind == "minted" && !looksSecret(name, "") {
 						continue
 					}
-					if _, ok := out[name]; !ok {
-						out[name] = reader{service: s, added: i == 0, secret: s.Kind == "secret", minted: s.Kind == "minted"}
+					r := reader{service: s, added: i == 0, secret: s.Kind == "secret", minted: s.Kind == "minted"}
+					if have, ok := out[name]; !ok {
+						out[name] = r
+					} else if r.minted && !have.secret && !have.minted && have.mintedAlt == nil {
+						have.mintedAlt = &r
+						out[name] = have
 					}
 				}
 			}
@@ -216,6 +224,9 @@ func (c *ctx) initEnv(args []string) error {
 	seen := map[string]bool{}
 	for _, n := range names {
 		r, ok := reads[n]
+		if ok && r.mintedAlt != nil && pickKey(keys, r.mintedAlt.service.ID, plan.KeyName, false) != nil {
+			r = *r.mintedAlt // a short-lived key saved for it: better than a stand-in
+		}
 		if ok && r.secret && n == "DATABASE_URL" && values[n] != "" && !isPostgresURL(values[n]) {
 			ok = false // a MySQL or SQLite URL: kept as a secret of its own
 		}
