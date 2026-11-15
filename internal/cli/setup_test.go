@@ -356,3 +356,75 @@ func dotenvLine(text, name string) string {
 	}
 	return ""
 }
+
+// awsEdge is an edge that delivers AWS: a credentials file, and the
+// long-lived variables blanked so the file wins.
+func awsEdge(t *testing.T, token, delivery string) *httptest.Server {
+	t.Helper()
+	expires := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch req.URL.Path {
+		case "/catalog":
+			_ = json.NewEncoder(w).Encode(map[string]any{"token": map[string]any{"id": "tk_1", "name": "ci", "env": "shop/dev", "expiresAt": expires}, "services": []any{}})
+		case "/provision":
+			if req.Header.Get("Authorization") != "Bearer "+token || req.Header.Get("Keystub-Delivery-Key") != delivery {
+				http.Error(w, `{"error":{"message":"no"}}`, 401)
+				return
+			}
+			v := func(name, value string) map[string]any {
+				return map[string]any{"name": name, "service": "aws", "value": value, "secret": false}
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"variables": []any{
+					map[string]any{"name": "AWS_SHARED_CREDENTIALS_FILE", "service": "aws", "file": "aws/credentials", "secret": false},
+					v("AWS_PROFILE", "default"), v("AWS_REGION", "eu-west-1"), v("AWS_DEFAULT_REGION", "eu-west-1"),
+					v("AWS_ACCESS_KEY_ID", ""), v("AWS_SECRET_ACCESS_KEY", ""), v("AWS_SESSION_TOKEN", ""),
+				},
+				"files": []any{map[string]any{"path": "aws/credentials", "service": "aws", "content": "[default]\naws_access_key_id = ASIAMINTED\n"}},
+				"items": []any{map[string]any{"service": "aws", "name": "AWS", "kind": "minted", "protection": "short-lived", "variables": []string{"AWS_SHARED_CREDENTIALS_FILE"}, "expiresAt": expires, "refreshAfter": expires}},
+			})
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	t.Cleanup(s.Close)
+	return s
+}
+
+func TestSetupAWSInASandbox(t *testing.T) {
+	noGcloud(t)
+	r := newRig(t)
+	const tok = "sk-stub-0123456789abcdef0123456789abcdef"
+	edge := awsEdge(t, tok, "sk-dlv-abc")
+	home := t.TempDir()
+	r.home = filepath.Join(home, ".keystub")
+	r.env = map[string]string{"KEYSTUB_TOKEN": tok, "KEYSTUB_DELIVERY_KEY": "sk-dlv-abc", "KEYSTUB_EDGE": edge.URL, "HOME": home}
+	path := filepath.Join(t.TempDir(), ".env")
+	write(t, path, "AWS_ACCESS_KEY_ID=AKIAREALLONGLIVED123\nAWS_SECRET_ACCESS_KEY=real-secret\nPORT=3000\n")
+
+	// The long-lived key in the file is the person's: blanking it needs a yes.
+	if res := r.run("", "setup", "--env-file", path, "--json"); res.code == 0 || !strings.Contains(res.stdout+res.stderr, "AWS_ACCESS_KEY_ID") {
+		t.Fatalf("replaced without asking: %d %s %s", res.code, res.stdout, res.stderr)
+	}
+	out := r.must("", "setup", "--env-file", path, "--yes", "--json").json(t)
+	creds := filepath.Join(r.home, "files", "shop-dev", "aws", "credentials")
+	text := readFile(t, path)
+	for _, want := range []string{"AWS_SHARED_CREDENTIALS_FILE=" + creds, "AWS_REGION=eu-west-1", "PORT=3000"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf(".env lacks %s:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "AKIAREALLONGLIVED123") || strings.Contains(text, "real-secret") {
+		t.Fatalf("the long-lived key is still in .env:\n%s", text)
+	}
+	if !strings.Contains(readFile(t, creds), "ASIAMINTED") {
+		t.Fatal("credentials file")
+	}
+	sh := readFile(t, filepath.Join(r.home, "env.sh"))
+	if !strings.Contains(sh, "export AWS_ACCESS_KEY_ID=''") || !strings.Contains(sh, "export AWS_SHARED_CREDENTIALS_FILE='"+creds+"'") {
+		t.Fatalf("env.sh:\n%s", sh)
+	}
+	if s := mustJSON(t, out["clis"]); !strings.Contains(s, "aws CLI") {
+		t.Fatalf("clis %s", s)
+	}
+}

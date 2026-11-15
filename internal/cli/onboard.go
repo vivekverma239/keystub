@@ -86,6 +86,7 @@ type reader struct {
 	added     bool
 	templated bool
 	secret    bool // a delivered secret's variable (Postgres's DATABASE_URL)
+	minted    bool // a minted service's variable (AWS's AWS_ACCESS_KEY_ID): never saved from the file
 }
 
 func (c *ctx) readers() (map[string]reader, error) {
@@ -107,10 +108,15 @@ func (c *ctx) readers() (map[string]reader, error) {
 					out[name] = reader{service: s, added: i == 0, templated: hasTmpl && tmpl != "{key}"}
 				}
 			}
-			if s.Kind == "secret" {
+			if s.Kind == "secret" || s.Kind == "minted" {
 				for _, name := range s.Variables {
+					// A minted service's plain settings (AWS_REGION, a project)
+					// say nothing about a key: only its credential names count.
+					if s.Kind == "minted" && !looksSecret(name, "") {
+						continue
+					}
 					if _, ok := out[name]; !ok {
-						out[name] = reader{service: s, added: i == 0, secret: true}
+						out[name] = reader{service: s, added: i == 0, secret: s.Kind == "secret", minted: s.Kind == "minted"}
 					}
 				}
 			}
@@ -255,6 +261,10 @@ func (c *ctx) initEnv(args []string) error {
 		} else {
 			reason := ""
 			switch {
+			case r.minted:
+				// A file's long-lived key is what minting keeps off the box:
+				// it is saved in Keystub with what it may assume, not copied.
+				reason = "minted by Keystub from a saved " + r.service.Name + " key: add one in the dashboard (Keys, Add key), then run init again"
 			case strings.TrimSpace(values[n]) == "" && src.Kind == "code":
 				reason = "read in " + src.FoundIn[n] + " but there's no value: save it with keystub keys add " + st.Service
 			case strings.TrimSpace(values[n]) == "" && src.Kind == "example":

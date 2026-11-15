@@ -32,7 +32,9 @@ import (
 //   - Never on the box: a base URL on the edge and a stand-in key, for
 //     every linked service with a base URL. The real key stays in Keystub.
 //   - Short-lived on the box: a credential minted for this box (Google
-//     Cloud: a 1-hour token in a file). Running setup again refreshes it.
+//     Cloud: a 1-hour token in a file; AWS: a session of at most an hour in
+//     a credentials file), never outliving the token. Running setup again
+//     refreshes it.
 //   - On the box: a saved secret (a database URL, a deploy key), as it is.
 //
 // The variables go into the dotenv file (.env by default), keeping every
@@ -759,7 +761,21 @@ func (c *ctx) cliPlan(vars []setVar) []string {
 	if gcloudVars(vars) != nil {
 		out = append(out, "gcloud (configuration keystub)")
 	}
+	if f := awsFile(vars); f != "" {
+		out = append(out, "aws CLI and SDKs (AWS_SHARED_CREDENTIALS_FILE)")
+	}
 	return out
+}
+
+// awsFile is the credentials file AWS's delivery sets, or "". The AWS CLI
+// and SDKs read it on every call, so a refresh needs no new shell.
+func awsFile(vars []setVar) string {
+	for _, v := range vars {
+		if v.Name == "AWS_SHARED_CREDENTIALS_FILE" {
+			return v.value
+		}
+	}
+	return ""
 }
 
 // gcloudVars is the token file and project Google Cloud's delivery sets,
@@ -801,6 +817,9 @@ func (c *ctx) setUpCLIs(vars []setVar) ([]string, error) {
 			}
 		}
 		done[0] = "shell (~/.keystub/env.sh, sourced from ~/.profile and ~/.bashrc)"
+	}
+	if f := awsFile(vars); f != "" {
+		done = append(done, "aws CLI and SDKs ("+f+", profile default)")
 	}
 	if g := gcloudVars(vars); g != nil {
 		if gc, err := lookGcloud(); err == nil {
