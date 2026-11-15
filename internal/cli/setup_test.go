@@ -102,6 +102,25 @@ func TestSetupOnALaptop(t *testing.T) {
 		t.Fatalf("new stand-in through the edge: %d", code)
 	}
 
+	// A kept access that's gone (a fresh ~/.keystub): the folder's old
+	// token is revoked and a new one made under the same name.
+	if err := os.RemoveAll(filepath.Join(r.home, "access")); err != nil {
+		t.Fatal(err)
+	}
+	fourth := r.must("", "setup", "--env-file", path, "--json").json(t)
+	if fourth["token"].(map[string]any)["made"] != true {
+		t.Fatalf("after losing the access: %v", fourth)
+	}
+	live := 0
+	for _, x := range r.must("", "tokens", "list", "shop/dev", "--json").json(t)["tokens"].([]any) {
+		if x.(map[string]any)["state"] == "active" {
+			live++
+		}
+	}
+	if live != 1 {
+		t.Fatalf("live tokens after losing the access: %d", live)
+	}
+
 	// Its access file is the owner's alone.
 	entries, _ := os.ReadDir(filepath.Join(r.home, "access"))
 	if len(entries) != 1 {
