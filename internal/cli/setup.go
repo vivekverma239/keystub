@@ -211,7 +211,16 @@ func (c *ctx) setup(args []string) error {
 			res.NextSteps = []string{"keystub setup " + shellQuote(a.env) + " --env-file " + shellQuote(file) + "   (makes a token for this folder and writes " + file + ")"}
 			return c.emit(res, func(w io.Writer) { c.printSetup(w, res) })
 		}
-		if err := c.askToReplace(res.Set, values, "", managed, file); err != nil {
+		// Only stand-ins are sure to replace a real value here; a secret's
+		// value isn't known until it's delivered, and is usually the one in
+		// the file, so it's compared below.
+		var standIn []setVar
+		for _, v := range res.Set {
+			if v.Protection == neverOnBox {
+				standIn = append(standIn, v)
+			}
+		}
+		if err := c.askToReplace(standIn, values, "", managed, file); err != nil {
 			return err
 		}
 		res.Set = []setVar{}
@@ -401,6 +410,26 @@ func (c *ctx) makeLaptopToken(a *access, ttl string) error {
 		a.oldTokenID = ""
 	}
 	made, err := c.makeAccess(path, map[string]any{"name": name, "ttl": ttl})
+	var taken *Error
+	if errors.As(err, &taken) && taken.Code == ExitConflict {
+		// This folder's token from a kept access that's gone (a fresh
+		// ~/.keystub): nobody can use it any more, so it's revoked and made
+		// again.
+		var ts struct {
+			Tokens []token `json:"tokens"`
+		}
+		if err := c.call("GET", path+"/tokens", nil, &ts); err != nil {
+			return err
+		}
+		for _, t := range ts.Tokens {
+			if t.Name == name && t.RevokedAt == nil {
+				if err := c.call("POST", "/api/tokens/"+url.PathEscape(t.ID)+"/revoke", nil, nil); err != nil {
+					return err
+				}
+			}
+		}
+		made, err = c.makeAccess(path, map[string]any{"name": name, "ttl": ttl})
+	}
 	if err != nil {
 		return err
 	}
