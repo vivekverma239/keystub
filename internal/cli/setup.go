@@ -33,8 +33,8 @@ import (
 //     every linked service with a base URL. The real key stays in Keystub.
 //   - Short-lived on the box: a credential minted for this box (Google
 //     Cloud: a 1-hour token in a file; AWS: a session of at most an hour in
-//     a credentials file), never outliving the token. Running setup again
-//     refreshes it.
+//     a credentials file; Fly.io and Cloudflare: a token in a variable),
+//     never outliving the token. Running setup again refreshes it.
 //   - On the box: a saved secret (a database URL, a deploy key), as it is.
 //
 // The variables go into the dotenv file (.env by default), keeping every
