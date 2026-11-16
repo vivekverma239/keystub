@@ -335,7 +335,7 @@ func (c *ctx) statusEnv(out map[string]any, path, env string, names []string, va
 			vars = append(vars, vs...)
 		}
 		sort.Strings(vars)
-		next = append(next, fmt.Sprintf("%s still hold real keys for services with no base URL, which setup leaves alone: those go through Keystub's proxy. On a machine running keystub serve or linked with keystub link, keystub run --env %s -- COMMAND gives the app a token for them; elsewhere see the skill's \"Send requests through Keystub\". Ask the user before replacing the keys in %s", strings.Join(vars, ", "), shellQuote(env), shellQuote(sf.Path)))
+		next = append(next, fmt.Sprintf("%s still hold real keys for services with no base URL, which setup leaves alone: those go through Keystub's proxy. On a machine running keystub serve or linked with keystub link, keystub run --env %s -- COMMAND gives the app a token for them; elsewhere see the skill's \"Send requests through Keystub\". Ask the user once (this line stays while the keys are in the file) before replacing them in %s", strings.Join(vars, ", "), shellQuote(env), shellQuote(sf.Path)))
 	}
 	if !initChanges && len(untaken) > 0 {
 		next = append(next, fmt.Sprintf("%s still hold real keys that init and setup leave alone (%s shows why under skipped): tell the user", strings.Join(untaken, ", "), suggest("init", "--dry-run", "--json")))
