@@ -797,6 +797,10 @@ func (c *ctx) tokens(args []string) error {
 		if p.has("delivery") && (p.has("write-env") || p.has("service")) {
 			return usageErr("--delivery makes an access for a sandbox to run keystub setup with: it goes without --write-env and --service")
 		}
+		svcs := p.list("service")
+		if p.has("service") && len(svcs) == 0 {
+			return usageErr("--service needs a service ID, e.g. --service openai")
+		}
 		var plan *tokenFile
 		var backup string
 		if p.has("write-env") {
@@ -806,7 +810,7 @@ func (c *ctx) tokens(args []string) error {
 			if err := checkWritable(file); err != nil {
 				return err
 			}
-			if plan, err = c.planTokenFile(path, p.list("service"), p.has("base-urls")); err != nil {
+			if plan, err = c.planTokenFile(path, svcs, p.has("base-urls")); err != nil {
 				return err
 			}
 			if err := c.confirmWrite(file, *plan); err != nil {
@@ -819,10 +823,6 @@ func (c *ctx) tokens(args []string) error {
 		body := map[string]any{"name": p.flags["name"]}
 		if v := p.flags["ttl"]; v != "" {
 			body["ttl"] = v
-		}
-		svcs := p.list("service")
-		if p.has("service") && len(svcs) == 0 {
-			return usageErr("--service needs a service ID, e.g. --service openai")
 		}
 		switch {
 		case len(svcs) == 1:
@@ -845,7 +845,9 @@ func (c *ctx) tokens(args []string) error {
 		if len(svcs) > 1 && !sameSet(out.Token.covers(), svcs) {
 			// A server without tokens for several services may have made
 			// one for more than was asked: never leave that behind.
-			_ = c.call("POST", "/api/tokens/"+url.PathEscape(out.Token.ID)+"/revoke", nil, nil)
+			if err := c.call("POST", "/api/tokens/"+url.PathEscape(out.Token.ID)+"/revoke", nil, nil); err != nil {
+				return &Error{Code: ExitError, Message: fmt.Sprintf("this server can't make a token for several services: it made a broader one, %s, and revoking it failed (%v). Revoke it now: keystub tokens revoke %s --yes", out.Token.ID, err, out.Token.ID)}
+			}
 			return &Error{Code: ExitError, Message: "this server can't make a token for several services (it made a broader one, now revoked): update it, or make one token per service"}
 		}
 		if plan != nil {

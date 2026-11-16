@@ -685,11 +685,11 @@ func (s *Server) apiTokens(w http.ResponseWriter, r *http.Request, env core.Envi
 
 func (s *Server) apiCreateToken(w http.ResponseWriter, r *http.Request, env core.Environment) {
 	var in struct {
-		Name    string  `json:"name"`
-		TTL     string  `json:"ttl"`
-		Limits  *Limits `json:"limits"`
-		Service  *string   `json:"service"`
-		Services *[]string `json:"services"`
+		Name     string          `json:"name"`
+		TTL      string          `json:"ttl"`
+		Limits   *Limits         `json:"limits"`
+		Service  *string         `json:"service"`
+		Services json.RawMessage `json:"services"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -708,15 +708,21 @@ func (s *Server) apiCreateToken(w http.ResponseWriter, r *http.Request, env core
 		spec.Service = *in.Service
 	}
 	if in.Services != nil {
+		// A null or empty list is refused, never read as every service.
+		var list []string
+		if err := json.Unmarshal(in.Services, &list); err != nil {
+			apiError(w, http.StatusBadRequest, "services must be a list of service IDs")
+			return
+		}
 		if in.Service != nil {
 			apiError(w, http.StatusBadRequest, "give service or services, not both")
 			return
 		}
-		if len(*in.Services) == 0 {
+		if len(list) == 0 {
 			apiError(w, http.StatusBadRequest, "services is empty: leave it out for an environment token")
 			return
 		}
-		spec.Services = *in.Services
+		spec.Services = list
 	}
 	secret, t, err := s.Core.CreateToken(r.Context(), spec)
 	if err != nil {
