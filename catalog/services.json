@@ -2280,6 +2280,215 @@
         "CLOUDINARY_API_SECRET"
       ],
       "statusPage": "https://status.cloudinary.com"
+    },
+    {
+      "id": "mapbox",
+      "name": "Mapbox",
+      "category": "maps",
+      "docs": "https://docs.mapbox.com/api/overview/",
+      "note": "The access token goes in the access_token query parameter; Keystub swaps it there and puts the token back wherever the real key shows up in a response. Use an opaque stand-in with curl or the Python SDK; mapbox-sdk-js checks the token's shape.",
+      "hosts": [
+        "api.mapbox.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}",
+        "query": "access_token"
+      },
+      "envVars": [
+        "MAPBOX_ACCESS_TOKEN"
+      ],
+      "statusPage": "https://status.mapbox.com"
+    },
+    {
+      "id": "telegram",
+      "name": "Telegram Bot API",
+      "category": "messaging",
+      "docs": "https://core.telegram.org/bots/api",
+      "note": "The bot token is part of the path (/bot<token>/<method>, /file/bot<token>/<path>, and the /test/ forms under them); Keystub swaps it there and puts the token back wherever the real key shows up in a response.",
+      "hosts": [
+        "api.telegram.org"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}",
+        "path": [
+          "/bot{key}/",
+          "/file/bot{key}/"
+        ]
+      },
+      "envVars": [
+        "TELEGRAM_BOT_TOKEN"
+      ]
+    },
+    {
+      "id": "google-maps",
+      "name": "Google Maps Platform",
+      "category": "maps",
+      "docs": "https://developers.google.com/maps/documentation/geocoding/get-api-key",
+      "note": "The key goes in the key query parameter (the newer APIs also take X-Goog-Api-Key); the Python googlemaps client wants a key starting AIza, so start the stand-in's name with it if needed; Keystub swaps it there and puts the token back wherever the real key shows up in a response.",
+      "hosts": [
+        "maps.googleapis.com",
+        "places.googleapis.com",
+        "routes.googleapis.com",
+        "addressvalidation.googleapis.com",
+        "roads.googleapis.com",
+        "geolocation.googleapis.com",
+        "tile.googleapis.com",
+        "solar.googleapis.com",
+        "airquality.googleapis.com",
+        "pollen.googleapis.com",
+        "weather.googleapis.com",
+        "routeoptimization.googleapis.com"
+      ],
+      "auth": {
+        "header": "X-Goog-Api-Key",
+        "format": "{key}",
+        "query": "key"
+      },
+      "envVars": [
+        "GOOGLE_MAPS_API_KEY"
+      ],
+      "statusPage": "https://status.cloud.google.com/maps-platform/"
+    },
+    {
+      "id": "trello",
+      "name": "Trello",
+      "category": "productivity",
+      "docs": "https://developer.atlassian.com/cloud/trello/guides/rest-api/authorization/",
+      "note": "The key goes in the token query parameter (or the oauth_token in an Authorization: OAuth header); the API key (TRELLO_API_KEY) only names the app and stays as is. OAuth1-signed requests can't be swapped; Keystub swaps it there and puts the token back wherever the real key shows up in a response.",
+      "hosts": [
+        "api.trello.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "OAuth oauth_token=\"{key}\"",
+        "query": "token"
+      },
+      "envVars": [
+        "TRELLO_TOKEN"
+      ],
+      "statusPage": "https://trello.status.atlassian.com"
+    },
+    {
+      "id": "locationiq",
+      "name": "LocationIQ",
+      "category": "maps",
+      "docs": "https://docs.locationiq.com/docs/authentication",
+      "note": "The key goes in the key query parameter; Keystub swaps it there and puts the token back wherever the real key shows up in a response.",
+      "hosts": [
+        "us1.locationiq.com",
+        "eu1.locationiq.com",
+        "api.locationiq.com",
+        "maps.locationiq.com",
+        "tiles.locationiq.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}",
+        "query": "key"
+      },
+      "envVars": [
+        "LOCATIONIQ_API_KEY"
+      ],
+      "statusPage": "https://status.locationiq.com"
+    },
+    {
+      "id": "ncbi-eutils",
+      "name": "NCBI E-utilities",
+      "category": "data",
+      "docs": "https://www.ncbi.nlm.nih.gov/books/NBK25497/",
+      "note": "The key goes in the api_key query parameter (or the api-key header); NCBI echoes a bad key in its error; Keystub swaps it there and puts the token back wherever the real key shows up in a response.",
+      "hosts": [
+        "eutils.ncbi.nlm.nih.gov"
+      ],
+      "auth": {
+        "header": "api-key",
+        "format": "{key}",
+        "query": "api_key"
+      },
+      "envVars": [
+        "NCBI_API_KEY"
+      ]
+    },
+    {
+      "id": "serpapi",
+      "name": "SerpApi",
+      "category": "search",
+      "docs": "https://serpapi.com/search-api",
+      "note": "The key goes in the api_key query parameter; Keystub swaps it there and puts the token back wherever the real key shows up in a response.",
+      "hosts": [
+        "serpapi.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}",
+        "query": "api_key"
+      },
+      "envVars": [
+        "SERPAPI_API_KEY",
+        "SERPAPI_KEY"
+      ],
+      "statusPage": "https://status.serpapi.com"
+    },
+    {
+      "id": "openweather",
+      "name": "OpenWeather",
+      "category": "data",
+      "docs": "https://openweathermap.org/appid",
+      "note": "The key goes in the appid query parameter; Keystub swaps it there and puts the token back wherever the real key shows up in a response.",
+      "hosts": [
+        "api.openweathermap.org",
+        "pro.openweathermap.org",
+        "history.openweathermap.org",
+        "tile.openweathermap.org",
+        "maps.openweathermap.org",
+        "bulk.openweathermap.org"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}",
+        "query": "appid"
+      },
+      "envVars": [
+        "OPENWEATHER_API_KEY"
+      ]
+    },
+    {
+      "id": "alpha-vantage",
+      "name": "Alpha Vantage",
+      "category": "trading",
+      "docs": "https://www.alphavantage.co/documentation/",
+      "note": "The key goes in the apikey query parameter; Keystub swaps it there and puts the token back wherever the real key shows up in a response.",
+      "hosts": [
+        "www.alphavantage.co"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}",
+        "query": "apikey"
+      },
+      "envVars": [
+        "ALPHAVANTAGE_API_KEY"
+      ]
+    },
+    {
+      "id": "fred",
+      "name": "FRED",
+      "category": "data",
+      "docs": "https://fred.stlouisfed.org/docs/api/api_key.html",
+      "note": "The key goes in the api_key query parameter (API v2 also takes Authorization: Bearer); Keystub swaps it there and puts the token back wherever the real key shows up in a response.",
+      "hosts": [
+        "api.stlouisfed.org"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}",
+        "query": "api_key"
+      },
+      "envVars": [
+        "FRED_API_KEY"
+      ]
     }
   ]
 }

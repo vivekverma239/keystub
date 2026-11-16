@@ -165,7 +165,7 @@ No certificate is added to the macOS keychain. The only thing Keystub keeps ther
 
 ## Not yet
 
-Transparent mode for Linux boxes and sandboxes, the hosted edge, a Keychain for the machine credential off macOS, usage metadata beyond LLM services, keys in query strings or bodies, TCP connections (databases, SSH), name constraints on the CA, and a master key in KMS. With `--storage json`, limit counts are in memory and reset when the server restarts, and the request log rotates at 10 MB to `requests.jsonl.1`.
+Transparent mode for Linux boxes and sandboxes, the hosted edge, a Keychain for the machine credential off macOS, usage metadata beyond LLM services, keys in request bodies, TCP connections (databases, SSH), name constraints on the CA, and a master key in KMS. With `--storage json`, limit counts are in memory and reset when the server restarts, and the request log rotates at 10 MB to `requests.jsonl.1`.
 
 ## Tests
 

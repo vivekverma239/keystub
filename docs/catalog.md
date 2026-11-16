@@ -15,6 +15,8 @@ summary: The shared list of services, its fields, and how to add a service.
 | `name` | Yes | Shown in the dashboard |
 | `hosts` | Yes | Host names the key may be sent to. `*.example.com` covers subdomains only, not `example.com` itself. Only letters, digits, dots and dashes |
 | `auth.header`, `auth.format` | No | The service's own auth header and how to write the key in it, e.g. `x-api-key` / `{key}`. Default `Authorization` / `Bearer {key}` |
+| `auth.query` | No | The query parameter the service reads its key from, e.g. `access_token` for Mapbox. See [keys in the URL](#keys-in-the-url) |
+| `auth.path` | No | Path prefixes with the key in them, e.g. `["/bot{key}/"]` for Telegram. Each starts and ends with `/` and holds `{key}` once |
 | `baseUrl.var`, `baseUrl.path` | No | The SDK's base-URL variable and the path it expects after the host, e.g. `OPENAI_BASE_URL` with `/v1`. Needed for quick start; also needs a host that isn't a wildcard. An agent or `--token` takes it only for a built-in service |
 | `envVars` | No | Variables `keystub run` sets to the proxy token. `NAME=template` fills `{key}` (or `{key_compact}`, the dash-free form) into a shaped key, e.g. `CONVEX_DEPLOY_KEY=prod:my-app\|{key}` |
 | `category`, `docs`, `note` | No | For display and for whoever edits the file |
@@ -28,6 +30,14 @@ The loader rejects a bad entry at start-up, and `catalog/catalog_test.go` checks
 The proxy token is swapped for the real key only in `Authorization` and in the service's own `auth.header`. A token in any other header refuses the request, because a service might store that header and return the real key later. So `auth.header` must be the header the service really reads the key from; a wrong one makes Keystub refuse requests that put the token there.
 
 When a request carries no token in those headers, Keystub writes `auth.header: auth.format` itself.
+
+## Keys in the URL
+
+Some services read their key from the URL: one query parameter (`auth.query`) or a spot in the path (`auth.path`). A token is swapped only there, besides the auth headers. A token anywhere else in the URL (another parameter, a parameter's name, elsewhere in the path), or in the URL of a service with neither field, refuses the request (400): URLs are logged and echoed back far more than auth headers.
+
+With no token anywhere, Keystub writes the key into `auth.query` (replacing a value sent there), or into the auth header for a service without one. A service that reads its key only from the path gets nothing written.
+
+A service may echo its URL: a next-page link, a redirect, a file link, an error quoting the request. So for these services Keystub puts the token back wherever the real key shows up in a response, as written or URL-escaped, in every header and in the body as it streams past. It asks the service for an uncompressed body to read; a gzipped one is decompressed, and one in any other encoding is cut off rather than passed on unread. The response loses its `Content-Length`, since the token and the key differ in length.
 
 ## Adding a service
 
@@ -46,8 +56,6 @@ Services whose auth doesn't fit one key in one header:
 | --- | --- |
 | Modal | Two secrets per request |
 | Helicone per-provider proxies (oai.helicone.ai and others) | The provider's key in Authorization and Helicone's in Helicone-Auth; the catalog's Helicone entry covers the AI Gateway |
-| NCBI E-utilities, Trello, LocationIQ, Mapbox | The key goes in the query string |
-| Telegram Bot API | The bot token is part of the URL path |
 | MongoDB Atlas | Clusters speak the MongoDB wire protocol, not HTTP; the Admin API takes hour-long tokens or Digest auth |
 | Auth0 Management API | Its tokens last a day and are minted with the client secret in a request body |
 | Segment tracking API | The SDKs repeat the write key in the request body |

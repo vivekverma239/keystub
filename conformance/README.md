@@ -16,6 +16,14 @@ headers as the client sent them, the real key, the token that must be found
 absent). After the swap, no header may still contain a proxy token in either
 form (`sk-stub-…` or `skstub…`).
 
+Cases with a `url` (path and query) also check where in the URL a token
+may be (the service's `auth.query` parameter or `auth.path` spot) and what
+URL reaches the service (`upstreamUrl`). The `scrub` cases cover putting
+the token back for the real key in responses, for services whose key goes
+in the URL: the response's headers and body as the service sent them, and
+what the client must get. A runner must get the same answer feeding the
+body whole and in small chunks.
+
 `usage.json` covers reading usage from a response. Each case names a
 service, the request (method, path, and a JSON body when the model comes
 from it), and the response (status, headers, body as sent: JSON, or

@@ -74,12 +74,12 @@ Choosing the token check: the gateway asks the edge, rather than forwarding ever
 
 Every route ends in the same check-and-swap:
 
-1. Refuse a token sitting outside the auth headers (400): a service may store or echo other headers and so hand the real key back. Then find the token: `Proxy-Authorization` (proxy), the `Keystub-Token` header (edge), else the auth headers (`Authorization` and the service's own, e.g. `x-api-key` for Anthropic), also inside Basic auth, in either form (`sk-stub-…` or `skstub…`).
+1. Refuse a token sitting outside the auth headers (400): a service may store or echo other headers and so hand the real key back. The same goes for a token in the URL, except in the service's key query parameter or path spot ([keys in the URL](catalog.md#keys-in-the-url)). Then find the token: `Proxy-Authorization` (proxy), the `Keystub-Token` header (edge), else the auth headers (`Authorization` and the service's own, e.g. `x-api-key` for Anthropic), also inside Basic auth, in either form (`sk-stub-…` or `skstub…`).
 2. Check it: unknown or revoked → 401, expired → 401, not allowed for this service → 403.
 3. Find the environment's link for the service and decrypt the saved key it names: no link → 502, can't decrypt → 500.
 4. Count the request against the project, environment and token limits, and the saved key's if it has any, in one step: any full → 429, and nothing is counted.
-5. Swap every token in the auth headers for the real key, keeping each value's shape. If none held a token, write the service's auth header.
-6. Forward over verified TLS and stream the response back, scanning it for usage on the way by the catalog's metadata (never buffered). Log method, host, path, status, duration, Keystub's own time, and the operation, model, outcome, tokens, cost and quota read; never headers, query strings or bodies. See [usage](usage.md).
+5. Swap every token in the auth headers and the URL's key spots for the real key, keeping each value's shape. If none held a token, write the service's key query parameter, or else its auth header.
+6. Forward over verified TLS and stream the response back, putting the token back for the real key in it when the key went in the URL, and scanning it for usage on the way by the catalog's metadata (never buffered). Log method, host, path, status, duration, Keystub's own time, and the operation, model, outcome, tokens, cost and quota read; never headers, query strings or bodies. See [usage](usage.md).
 
 Steps 1 and 5 are pinned down by [`conformance/swap.json`](../conformance/swap.json), step 6's usage by [`conformance/usage.json`](../conformance/usage.json).
 

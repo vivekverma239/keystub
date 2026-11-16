@@ -155,7 +155,7 @@ func (e *Edge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	target.RawQuery = r.URL.RawQuery
 
-	entry := core.Entry{Time: start.UTC(), Service: svc.ID, Method: r.Method, Host: host, Path: target.Path}
+	entry := core.Entry{Time: start.UTC(), Service: svc.ID, Method: r.Method, Host: host, Path: swap.RedactPath(target.Path)}
 	var meter *usage.Meter
 	defer func() {
 		// The response has been relayed (or abandoned) by now.
@@ -174,8 +174,17 @@ func (e *Edge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "keystub: "+msg)
 		return
 	}
+	if stray := swap.URLStray(target, svc); len(stray) > 0 {
+		msg := urlStrayMessage(stray, svc)
+		entry.Status, entry.Note = http.StatusBadRequest, msg
+		jsonError(w, http.StatusBadRequest, "keystub: "+msg)
+		return
+	}
 	if token == "" {
 		token = swap.Find(r.Header, svc.Header)
+	}
+	if token == "" {
+		token = swap.FindURL(target, svc)
 	}
 	g, err := e.Core.Authorize(context.Background(), token, svc.ID)
 	if g.Token.ID != "" {
@@ -190,10 +199,17 @@ func (e *Edge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	meter = usage.Start(svc.ID, r.Method, target.Path, start)
+	var scrub *swap.Scrubber
+	if swap.KeyInURL(svc) {
+		scrub = swap.NewScrubber(g.Key, token)
+	}
 	rp := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.Out.URL, pr.Out.Host = target, host
-			swap.Apply(pr.Out.Header, g.Key, svc.Header, svc.Format)
+			swap.Request(pr.Out.Header, pr.Out.URL, g.Key, svc)
+			if scrub != nil {
+				swap.Uncompressed(pr.Out.Header)
+			}
 			usage.Narrow(svc.ID, pr.Out.Header)
 			pr.Out.Body = meter.Request(pr.Out.Body, pr.Out.Header)
 		},
@@ -206,6 +222,9 @@ func (e *Edge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			entry.Status = resp.StatusCode
 			resp.Header.Del(OutcomeHeader) // only Keystub's own answers carry it
 			meter.Response(resp)           // scans the body as it is copied to the client
+			if scrub != nil {
+				scrub.Response(resp)
+			}
 			return nil
 		},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
