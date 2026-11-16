@@ -53,6 +53,9 @@ The short way, for a project with a .env file:
    AWS credentials from a key saved in the dashboard, so init links that key or
    says to add one. Where the account has a short-lived Fly.io or Cloudflare key
    saved, init links it instead of a stand-in.
+   When the code deploys somewhere (fly.toml, a wrangler config, convex/),
+   init ends by asking to connect it. On its own, at a terminal:
+   keystub connect                    (Fly.io and Convex from their CLIs' logins, Cloudflare from an account token it opens the page for)
 The steps below do the same one at a time.
 
 1. Sign in.

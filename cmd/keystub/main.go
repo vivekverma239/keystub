@@ -68,6 +68,8 @@ Set Keystub up from the command line (hosted or self-hosted):
   keystub setup [PROJECT/ENV] [--env-file FILE] [--ttl 7d] [--cli|--no-cli] [--dry-run] [--print]
   keystub status [PROJECT/ENV] [--env-file FILE] [--json]   what is set up here, and what to do next
   keystub doctor [PROJECT/ENV] [--env-file FILE]
+  keystub connect [PROJECT/ENV] [--dir DIR] [--only fly,convex,cloudflare] [--dry-run]
+                                  let sessions deploy where this code deploys to
   keystub services list | add | remove
   keystub keys list | add | scan | show | replace | rename | limits | delete
   keystub projects list | limits

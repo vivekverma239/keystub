@@ -31,7 +31,10 @@ With a coding agent, ask it to set Keystub up for the project: the [skill](#the-
 keystub init --dry-run     # what it would save: keys and secrets; then keystub init to do it
 keystub setup              # .env gets stand-ins in place of the real keys, and the secrets (asks; keeps a copy in ~/.keystub/backups)
 keystub doctor             # checks the setup and the token
+keystub connect            # lets sessions deploy where the code deploys to (asks for each)
 ```
+
+`keystub connect` finds `fly.toml`, a wrangler config and a `convex/` folder and, for each one you say yes to, saves a key Keystub mints a short-lived deploy sign-in from for every session: Fly.io from the `fly` CLI's login (`fly tokens create deploy`), Convex from the Convex CLI's login, Cloudflare from an account token it opens the page for and checks. `init` asks the same at its end.
 
 In a sandbox or CI job, make an access on your machine with `keystub tokens create my-app/dev --name ci --ttl 1d --delivery`, put its three variables (`KEYSTUB_TOKEN`, `KEYSTUB_DELIVERY_KEY`, `KEYSTUB_EDGE`) in the sandbox's environment, and run `keystub setup` there: it writes `.env`, exports the same variables from `~/.keystub/env.sh` for shells and CLIs, and points gcloud at its short-lived token.
 
