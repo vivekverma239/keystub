@@ -8,10 +8,12 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/vivekverma239/keystub/internal/ca"
 	"github.com/vivekverma239/keystub/internal/core"
 	"github.com/vivekverma239/keystub/internal/coretest"
 	"github.com/vivekverma239/keystub/internal/reqlog"
@@ -94,5 +96,65 @@ func TestEdgeKeyInURL(t *testing.T) {
 		if strings.Contains(en.Path, token) || strings.Contains(en.Path, "real") {
 			t.Fatalf("logged path %q", en.Path)
 		}
+	}
+}
+
+// TestInterceptKeyInURL runs a query-key service through the intercepting
+// proxy with the token in Proxy-Authorization: the key replaces the box's
+// own in the query, and the upstream's echo of it never reaches the client.
+func TestInterceptKeyInURL(t *testing.T) {
+	const real = "real:key+1"
+	var seen string
+	up := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		seen = req.URL.RequestURI() + " ae=" + req.Header.Get("Accept-Encoding")
+		w.Header().Set("Location", req.URL.RequestURI())
+		_, _ = io.WriteString(w, "next "+req.URL.RequestURI()+" "+real)
+	}))
+	t.Cleanup(up.Close)
+	s, dir := coretest.Engine(t, "")
+	c, err := ca.LoadOrCreate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l, _ := reqlog.Open("", 50)
+	if err := s.AddService(bg, core.Service{ID: "q", Name: "Q", Hosts: []string{"127.0.0.1"}, Query: "key"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := coretest.SetSecret(bg, s, core.DefaultEnv, "q", real); err != nil {
+		t.Fatal(err)
+	}
+	p := New(s, c, l)
+	pool := x509.NewCertPool()
+	pool.AddCert(up.Certificate())
+	p.Upstream = &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool}, DisableCompression: true}
+	ps := httptest.NewServer(p)
+	t.Cleanup(ps.Close)
+	pu, _ := url.Parse(ps.URL)
+	r := &rig{store: keys{s}, log: l, ca: c, proxyURL: pu, upstream: up}
+	token, _, _ := r.store.CreateKey("url", 0)
+
+	req, _ := http.NewRequest("GET", up.URL+"/v1/x?a=1&key=boxown", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	resp, err := r.client(c.Pool(), token).Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if want := "/v1/x?a=1&key=real%3Akey%2B1 ae="; seen != want {
+		t.Fatalf("upstream saw %q, want %q", seen, want)
+	}
+	got := string(b) + " " + resp.Header.Get("Location")
+	if strings.Contains(got, "real") || !strings.Contains(got, token) {
+		t.Fatalf("client saw %q", got)
+	}
+
+	resp, err = r.client(c.Pool(), token).Get(up.URL + "/v1/x?q=" + token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("stray token in the query: status %d", resp.StatusCode)
 	}
 }

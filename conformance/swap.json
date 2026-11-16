@@ -294,6 +294,18 @@
       }
     },
     {
+      "name": "another value of the key parameter is dropped when a token is swapped",
+      "service": "mapbox",
+      "url": "/x?access_token=pk.boxown&access_token=sk-stub-0a1b2c3d&limit=1",
+      "request": {},
+      "realKey": "pk.real",
+      "token": "sk-stub-0a1b2c3d",
+      "upstreamUrl": "/x?access_token=pk.real&limit=1",
+      "upstream": {
+        "Authorization": ""
+      }
+    },
+    {
       "name": "token in another query parameter is refused",
       "service": "mapbox",
       "url": "/search?q=sk-stub-0a1b2c3d&access_token=sk-stub-0a1b2c3d",
@@ -383,7 +395,7 @@
       }
     },
     {
-      "name": "token in Authorization still works for a query-key service",
+      "name": "token in Authorization of a query-key service puts the key in the query too",
       "service": "mapbox",
       "url": "/x?limit=1",
       "request": {
@@ -391,7 +403,7 @@
       },
       "realKey": "pk.real",
       "token": "sk-stub-0a1b2c3d",
-      "upstreamUrl": "/x?limit=1",
+      "upstreamUrl": "/x?limit=1&access_token=pk.real",
       "upstream": {
         "Authorization": "Bearer pk.real"
       }

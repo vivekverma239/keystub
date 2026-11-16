@@ -552,8 +552,8 @@ func bareScheme(s string) bool {
 // API key as the Basic user.
 var basicWords = []string{"", "X", "x", "api_token", "x-oauth-basic"}
 
-// strayMessage explains a refused request whose token sat outside the auth
-// headers, where the service might keep the real key and send it back.
+// urlStrayMessage explains a refused request whose token sat in the URL
+// outside the service's key spots.
 func urlStrayMessage(places []string, svc core.Service) string {
 	where := "Authorization or the service's own auth header"
 	switch {
@@ -565,6 +565,8 @@ func urlStrayMessage(places []string, svc core.Service) string {
 	return "the proxy token is in the " + strings.Join(places, ", ") + "; send it only in " + where
 }
 
+// strayMessage explains a refused request whose token sat outside the auth
+// headers, where the service might keep the real key and send it back.
 func strayMessage(headers []string) string {
 	return "the proxy token is in the " + strings.Join(headers, ", ") + " header; send it only in Authorization or the service's own auth header"
 }

@@ -74,7 +74,9 @@ func InURL(u *url.URL) string {
 }
 
 // Request puts realKey in place of every proxy token in the request's auth
-// headers and the service's key spots in u. If none held a token, it
+// headers and the service's key spots in u; a token only in the headers of
+// a service with a query parameter puts the key there too. If none held a
+// token, it
 // writes the key where the service reads it: its query parameter if it
 // has one, else header: format; a service that reads its key only from
 // the path gets nothing written. It reports whether a token was found.
@@ -83,7 +85,14 @@ func Request(h http.Header, u *url.URL, realKey string, svc core.Service) bool {
 	inHeaders := swapHeaders(h, realKey, svc.Header)
 	inURL := applyURL(u, realKey, svc)
 	switch {
-	case inHeaders || inURL:
+	case inURL:
+		return true
+	case inHeaders:
+		if svc.Query != "" {
+			// Many services that read the key from the query ignore every
+			// header, so it goes where they look as well.
+			setQuery(u, svc.Query, realKey)
+		}
 		return true
 	case svc.Query != "":
 		setQuery(u, svc.Query, realKey)
@@ -147,7 +156,15 @@ func applyURL(u *url.URL, realKey string, svc core.Service) bool {
 			}
 		}
 		if found {
-			u.RawQuery = joinQuery(parts)
+			// Any other value of the parameter (the box's own key) goes,
+			// so the service reads only the swapped one.
+			var kept []queryPart
+			for _, p := range parts {
+				if p.name != svc.Query || token(p.value) != "" {
+					kept = append(kept, p)
+				}
+			}
+			u.RawQuery = joinQuery(kept)
 		}
 	}
 	path := u.EscapedPath()
@@ -261,7 +278,8 @@ type Scrubber struct {
 func NewScrubber(realKey, token string) *Scrubber {
 	s := &Scrubber{token: []byte(token)}
 	seen := map[string]bool{}
-	for _, f := range []string{realKey, url.QueryEscape(realKey), url.PathEscape(realKey)} {
+	jsonEscaped := strings.ReplaceAll(realKey, "/", `\/`) // as PHP and some JSON encoders write it
+	for _, f := range []string{realKey, url.QueryEscape(realKey), url.PathEscape(realKey), jsonEscaped} {
 		if f == "" || seen[f] {
 			continue
 		}
@@ -287,11 +305,11 @@ func (s *Scrubber) Header(h http.Header) {
 // other encoding is cut off rather than passed on unread.
 func (s *Scrubber) Response(resp *http.Response) {
 	s.Header(resp.Header)
+	if resp.Body == nil || resp.Body == http.NoBody {
+		return // a HEAD or 304: its Content-Length describes a body not sent
+	}
 	resp.Header.Del("Content-Length")
 	resp.ContentLength = -1
-	if resp.Body == nil || resp.Body == http.NoBody {
-		return
-	}
 	body := resp.Body
 	switch enc := strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Encoding"))); enc {
 	case "", "identity":

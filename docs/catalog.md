@@ -35,9 +35,9 @@ When a request carries no token in those headers, Keystub writes `auth.header: a
 
 Some services read their key from the URL: one query parameter (`auth.query`) or a spot in the path (`auth.path`). A token is swapped only there, besides the auth headers. A token anywhere else in the URL (another parameter, a parameter's name, elsewhere in the path), or in the URL of a service with neither field, refuses the request (400): URLs are logged and echoed back far more than auth headers.
 
-With no token anywhere, Keystub writes the key into `auth.query` (replacing a value sent there), or into the auth header for a service without one. A service that reads its key only from the path gets nothing written.
+With no token anywhere, Keystub writes the key into `auth.query` (replacing a value sent there), or into the auth header for a service without one. A token only in the auth headers of a service with `auth.query` puts the key in the query too, since many of those services ignore headers; when a token is swapped in the query, any other value of that parameter is dropped. A service that reads its key only from the path gets nothing written.
 
-A service may echo its URL: a next-page link, a redirect, a file link, an error quoting the request. So for these services Keystub puts the token back wherever the real key shows up in a response, as written or URL-escaped, in every header and in the body as it streams past. It asks the service for an uncompressed body to read; a gzipped one is decompressed, and one in any other encoding is cut off rather than passed on unread. The response loses its `Content-Length`, since the token and the key differ in length.
+A service may echo its URL: a next-page link, a redirect, a file link, an error quoting the request. So for these services Keystub puts the token back wherever the real key shows up in a response, as written, URL-escaped or with `/` escaped as `\/`, in every header and in the body as it streams past. It asks the service for an uncompressed body to read; a gzipped one is decompressed, and one in any other encoding is cut off rather than passed on unread. A response with a body loses its `Content-Length`, since the token and the key differ in length.
 
 ## Adding a service
 
