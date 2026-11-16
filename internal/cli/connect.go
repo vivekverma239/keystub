@@ -48,6 +48,7 @@ type deployTarget struct {
 	Linked  bool     `json:"linked"`
 	Done    string   `json:"done,omitempty"` // what connect did
 	Skipped string   `json:"skipped,omitempty"`
+	env     string   // the environment it is being connected for
 }
 
 var (
@@ -101,6 +102,10 @@ func detectDeploys(dir string) []deployTarget {
 			}
 		case "wrangler.toml":
 			s := read()
+			// Top-level keys only: [env.*] tables have their own name.
+			if i := strings.Index(s, "\n["); i >= 0 {
+				s = s[:i]
+			}
 			if m := tomlName.FindStringSubmatch(s); m != nil {
 				t := deployTarget{Service: "cloudflare-minted", Name: "Cloudflare", Kind: "cloudflare", Target: m[1], File: rel}
 				if a := tomlAccount.FindStringSubmatch(s); a != nil {
@@ -275,10 +280,52 @@ func (c *ctx) connectTargets(env string, targets []deployTarget, dryRun bool) er
 	if !c.json {
 		c.printTargets(c.Stderr, env, targets)
 	}
-	var services struct {
-		Services []service `json:"services"`
+	keyName := strings.ReplaceAll(env, "/", "-")
+	var added map[string]bool // services the account has, once read
+	var keys []savedKey
+	// prepare makes what a link needs, once, before any token is made.
+	prepare := func(t *deployTarget) (*savedKey, error) {
+		if !exists {
+			if err := c.makeEnv(env); err != nil {
+				return nil, err
+			}
+			exists = true
+		}
+		if added == nil {
+			var ss struct {
+				Services []service `json:"services"`
+			}
+			if err := c.call("GET", "/api/services", nil, &ss); err != nil {
+				return nil, err
+			}
+			added = map[string]bool{}
+			for _, s := range ss.Services {
+				added[s.ID] = true
+			}
+			if keys, err = c.listKeys(); err != nil {
+				return nil, err
+			}
+		}
+		if !added[t.Service] {
+			if err := c.call("POST", "/api/services", map[string]any{"catalog": t.Service}, nil); err != nil {
+				return nil, fmt.Errorf("adding %s: %w", t.Name, err)
+			}
+			added[t.Service] = true
+		}
+		// A key of this name already there is replaced, unless another
+		// environment uses it too: replacing it would change that one.
+		for i, k := range keys {
+			if k.Service == t.Service && strings.EqualFold(k.Name, keyName) {
+				for _, e := range k.LinkedIn {
+					if e != env {
+						return nil, fmt.Errorf("the saved %s key %q is also used by %s: rename it (keystub keys rename %s NEW_NAME) and run again", t.Name, k.Name, e, k.ID)
+					}
+				}
+				return &keys[i], nil
+			}
+		}
+		return nil, nil
 	}
-	added := map[string]bool{}
 	for i := range targets {
 		t := &targets[i]
 		if t.Linked {
@@ -290,41 +337,38 @@ func (c *ctx) connectTargets(env string, targets []deployTarget, dryRun bool) er
 		}
 		if !c.ask(q) {
 			t.Skipped = "not now"
+			if !c.StdinTerminal {
+				t.Skipped = "nothing can ask here (stdin isn't a terminal): run keystub connect at a terminal, or pass --yes"
+			}
+			continue
+		}
+		t.env = env
+		have, err := prepare(t)
+		if err != nil {
+			t.Skipped = err.Error()
 			continue
 		}
 		value, err := c.deployCredential(t)
 		if err != nil {
 			t.Skipped = err.Error()
-			fmt.Fprintf(c.Stderr, "%s: %s\n", t.Name, t.Skipped)
 			continue
 		}
-		if !exists {
-			if err := c.makeEnv(env); err != nil {
-				return err
-			}
-			exists = true
+		var saved struct {
+			Key savedKey `json:"key"`
 		}
-		if services.Services == nil {
-			if err := c.call("GET", "/api/services", nil, &services); err != nil {
-				return err
-			}
-			for _, s := range services.Services {
-				added[s.ID] = true
-			}
-			services.Services = append(services.Services, service{})
+		if have != nil {
+			err = c.call("PUT", "/api/keys/"+url.PathEscape(have.ID)+"/value", map[string]string{"value": value}, &saved)
+			saved.Key.ID = have.ID
+		} else {
+			err = c.call("POST", "/api/keys", map[string]any{"service": t.Service, "name": keyName, "value": value}, &saved)
 		}
-		if !added[t.Service] {
-			if err := c.call("POST", "/api/services", map[string]any{"catalog": t.Service}, nil); err != nil {
-				return fmt.Errorf("adding %s: %w", t.Name, err)
-			}
-			added[t.Service] = true
-		}
-		k, err := c.saveOrReplace(t.Service, strings.ReplaceAll(env, "/", "-"), value)
 		if err != nil {
-			return fmt.Errorf("saving the %s key: %w", t.Name, err)
+			t.Skipped = fmt.Sprintf("saving the key: %v", err)
+			continue
 		}
-		if err := c.call("PUT", path+"/links/"+url.PathEscape(t.Service), map[string]any{"key": k.ID, "serviceToken": false}, nil); err != nil {
-			return fmt.Errorf("linking %s: %w", t.Name, err)
+		if err := c.call("PUT", path+"/links/"+url.PathEscape(t.Service), map[string]any{"key": saved.Key.ID, "serviceToken": false}, nil); err != nil {
+			t.Skipped = fmt.Sprintf("the key is saved as %q but linking it failed: %v", keyName, err)
+			continue
 		}
 		t.Linked = true
 		t.Done = "linked: each session gets a short-lived " + strings.Join(deliveredAs[t.Service], " and ")
@@ -392,26 +436,6 @@ func (c *ctx) askLine(q string) string {
 	return strings.TrimSpace(line)
 }
 
-// saveOrReplace saves value as service's key named name, or gives the
-// key of that name a new value.
-func (c *ctx) saveOrReplace(service, name, value string) (savedKey, error) {
-	ks, err := c.listKeys()
-	if err != nil {
-		return savedKey{}, err
-	}
-	var out struct {
-		Key savedKey `json:"key"`
-	}
-	for _, k := range ks {
-		if k.Service == service && strings.EqualFold(k.Name, name) {
-			err := c.call("PUT", "/api/keys/"+url.PathEscape(k.ID)+"/value", map[string]string{"value": value}, &out)
-			return out.Key, err
-		}
-	}
-	err = c.call("POST", "/api/keys", map[string]any{"service": service, "name": name, "value": value}, &out)
-	return out.Key, err
-}
-
 // deployCredential is the value saved for t: JSON with the token and what
 // it is for, as the server takes it. The value never reaches stdout.
 func (c *ctx) deployCredential(t *deployTarget) (string, error) {
@@ -431,7 +455,7 @@ func (c *ctx) flyCredential(t *deployTarget) (string, error) {
 	if err != nil {
 		return "", errors.New("the fly CLI isn't installed (https://fly.io/docs/flyctl/install/)")
 	}
-	out, err := runFly(fly, "tokens", "create", "deploy", "-a", t.Target, "-n", "Keystub", "-x", "8760h")
+	out, err := runFly(fly, "tokens", "create", "deploy", "-a", t.Target, "-n", "Keystub "+t.env, "-x", "8760h")
 	if err != nil {
 		return "", fmt.Errorf("fly tokens create deploy -a %s failed: %v (signed in? fly auth login)", t.Target, err)
 	}

@@ -57,13 +57,13 @@ func TestDetectDeploys(t *testing.T) {
 	dir2 := t.TempDir()
 	writeFile(t, filepath.Join(dir2, "convex", "_generated", "api.d.ts"), "")
 	writeFile(t, filepath.Join(dir2, ".env"), "export CONVEX_DEPLOY_KEY='prod:brave-fox-9|secretpart'\n")
-	writeFile(t, filepath.Join(dir2, "wrangler.toml"), "name = \"site\"\n[vars]\nname = \"not-this\"\n")
+	writeFile(t, filepath.Join(dir2, "wrangler.toml"), "main = \"x.ts\"\n[env.staging]\nname = \"not-this\"\n")
 	for _, d := range detectDeploys(dir2) {
 		if d.Kind == "convex" && d.Target != "brave-fox-9" {
 			t.Errorf("convex %+v", d)
 		}
-		if d.Kind == "cloudflare" && (d.Target != "site" || d.Account != "") {
-			t.Errorf("cloudflare %+v", d)
+		if d.Kind == "cloudflare" {
+			t.Errorf("a name only in [env.staging] was taken: %+v", d)
 		}
 	}
 	if len(detectDeploys(t.TempDir())) != 0 {
@@ -143,7 +143,11 @@ func newFakeDeployHosted(t *testing.T, envExists bool) *fakeDeployHosted {
 		defer f.mu.Unlock()
 		var ks []map[string]any
 		for _, k := range f.keys {
-			ks = append(ks, map[string]any{"id": k["id"], "service": k["service"], "name": k["name"]})
+			m := map[string]any{"id": k["id"], "service": k["service"], "name": k["name"]}
+			if k["linkedIn"] != "" {
+				m["linkedIn"] = strings.Split(k["linkedIn"], ",")
+			}
+			ks = append(ks, m)
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"keys": ks})
 	})
@@ -290,7 +294,7 @@ func TestConnect(t *testing.T) {
 	if strings.Contains(res.stdout+res.stderr, "fm2_") || strings.Contains(res.stdout+res.stderr, "convex-cli-token") {
 		t.Fatal("connect printed a token")
 	}
-	if strings.Join(flyArgs, " ") != "tokens create deploy -a acme-runner -n Keystub -x 8760h" {
+	if strings.Join(flyArgs, " ") != "tokens create deploy -a acme-runner -n Keystub acme/dev -x 8760h" {
 		t.Errorf("fly %v", flyArgs)
 	}
 	if v := f.value("fly-minted"); v["app"] != "acme-runner" || v["token"] != "FlyV1 fm2_abcdefghijklmnopqrstuvwxyz0123" {
@@ -349,6 +353,18 @@ func TestConnectFailures(t *testing.T) {
 	res = f.run(t, cr, "connect", "acme/dev", "--dir", dir, "--only", "convex")
 	if len(f.keys) != 0 || !strings.Contains(res.stdout, "can't make deploy keys for other-thing-4 (status 403)") {
 		t.Errorf("%s", res.stdout)
+	}
+	// No terminal and no --yes: nothing is done, and it says why.
+	res = f.run(t, &connectRun{home: home}, "connect", "acme/dev", "--dir", dir, "--only", "convex")
+	if !strings.Contains(res.stdout, "stdin isn't a terminal") {
+		t.Errorf("no terminal: %s", res.stdout)
+	}
+	// A key of the same name another environment uses is never replaced.
+	writeFile(t, filepath.Join(dir, ".env.cloud"), "CONVEX_DEPLOYMENT=prod:happy-animal-123\n")
+	f.keys = append(f.keys, map[string]string{"id": "key_shared", "service": "convex", "name": "acme-dev", "value": "{}", "linkedIn": "acme/dev,acme/staging"})
+	res = f.run(t, &connectRun{home: home, terminal: true, stdin: "y\n"}, "connect", "acme/dev", "--dir", dir, "--only", "convex")
+	if f.keys[0]["value"] != "{}" || !strings.Contains(res.stdout, "also used by acme/staging") {
+		t.Errorf("shared key: %v %s", f.keys[0], res.stdout)
 	}
 	if res := f.run(t, cr, "connect", "acme/dev", "--dir", t.TempDir()); res.code != ExitNotFound {
 		t.Errorf("empty folder: %d", res.code)
