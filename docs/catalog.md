@@ -45,6 +45,7 @@ Services whose auth doesn't fit one key in one header:
 | Service | Why |
 | --- | --- |
 | Modal | Two secrets per request |
+| Helicone per-provider proxies (oai.helicone.ai and others) | The provider's key in Authorization and Helicone's in Helicone-Auth; the catalog's Helicone entry covers the AI Gateway |
 | NCBI E-utilities, Trello, LocationIQ, Mapbox | The key goes in the query string |
 | Telegram Bot API | The bot token is part of the URL path |
 | MongoDB Atlas | Clusters speak the MongoDB wire protocol, not HTTP; the Admin API takes hour-long tokens or Digest auth |

@@ -1861,7 +1861,7 @@
       "name": "LangSmith",
       "category": "observability",
       "docs": "https://docs.langchain.com/langsmith",
-      "note": "Regional hosts (eu.api.smith.langchain.com and others) are covered by the wildcard; self-hosted instances aren't.",
+      "note": "Regional hosts (eu.api.smith.langchain.com and others) are covered by the wildcard; self-hosted instances aren't. No quick start, since the regions don't share a host.",
       "hosts": [
         "api.smith.langchain.com",
         "*.api.smith.langchain.com"
@@ -1869,9 +1869,6 @@
       "auth": {
         "header": "x-api-key",
         "format": "{key}"
-      },
-      "baseUrl": {
-        "var": "LANGSMITH_ENDPOINT"
       },
       "envVars": [
         "LANGSMITH_API_KEY",
@@ -1884,7 +1881,7 @@
       "name": "Langfuse",
       "category": "observability",
       "docs": "https://langfuse.com/docs/api-and-data-platform/features/public-api",
-      "note": "Basic auth: the public key (LANGFUSE_PUBLIC_KEY, pk-lf-\u2026) stays real as the user name; the proxy token is the password. Regions us., jp. and hipaa. are covered by the wildcard.",
+      "note": "Basic auth: the public key (LANGFUSE_PUBLIC_KEY, pk-lf-\u2026) stays real as the user name; the proxy token is the password. Regions us., jp. and hipaa. are covered by the wildcard; no quick start, since the regions don't share a host.",
       "hosts": [
         "cloud.langfuse.com",
         "*.cloud.langfuse.com"
@@ -1892,9 +1889,6 @@
       "auth": {
         "header": "Authorization",
         "format": "Bearer {key}"
-      },
-      "baseUrl": {
-        "var": "LANGFUSE_BASE_URL"
       },
       "envVars": [
         "LANGFUSE_SECRET_KEY"
@@ -1962,7 +1956,9 @@
       "docs": "https://qdrant.tech/documentation/cloud/authentication/",
       "note": "A cluster's database key over REST (port 6333). gRPC (port 6334) and the Cloud Management API (apikey scheme) aren't covered.",
       "hosts": [
-        "*.cloud.qdrant.io"
+        "*.aws.cloud.qdrant.io",
+        "*.gcp.cloud.qdrant.io",
+        "*.azure.cloud.qdrant.io"
       ],
       "auth": {
         "header": "api-key",
@@ -2108,20 +2104,15 @@
       "name": "PostHog",
       "category": "analytics",
       "docs": "https://posthog.com/docs/api",
-      "note": "The personal API key (phx_\u2026) for the private API and local flag evaluation. The project key (phc_\u2026) is public, goes in the body of capture calls and stays real.",
+      "note": "The personal API key (phx_\u2026) for the private API. The project key (phc_\u2026) is public and stays real; ingestion hosts (us.i.posthog.com and others) aren't claimed, so capture calls and local flag evaluation there go out unchanged.",
       "hosts": [
         "us.posthog.com",
         "eu.posthog.com",
-        "app.posthog.com",
-        "us.i.posthog.com",
-        "eu.i.posthog.com"
+        "app.posthog.com"
       ],
       "auth": {
         "header": "Authorization",
         "format": "Bearer {key}"
-      },
-      "baseUrl": {
-        "var": "POSTHOG_CLI_HOST"
       },
       "envVars": [
         "POSTHOG_PERSONAL_API_KEY",
