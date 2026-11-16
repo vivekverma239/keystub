@@ -7,6 +7,7 @@ Keystub swaps in the real key on the way out.
 ```bash
 npx keystub@latest init --dry-run   # what it would set up here; changes nothing
 npm install -g keystub              # or keep it on the PATH
+keystub skill install               # teach Claude Code, Codex and Cursor to use it
 ```
 
 npm installs the prebuilt binary for your platform (macOS, Linux and

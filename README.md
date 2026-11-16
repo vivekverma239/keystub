@@ -19,6 +19,7 @@ Saved keys ◄── link per service ── Environment ── Project
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vivekverma239/keystub/main/install.sh | sh
+#   (it offers to install the skill for coding agents, and refreshes one installed before)
 # or: npm install -g keystub    (or run it once: npx keystub@latest init --dry-run)
 # or: go install github.com/vivekverma239/keystub/cmd/keystub@latest
 keystub serve                  # prints the dashboard link with its admin token
@@ -109,6 +110,8 @@ Exit codes: 0 ok, 1 error, 2 usage, 3 not signed in, 4 not found, 5 conflict. Th
 ## The skill for coding agents
 
 [`skills/keystub/`](skills/keystub/SKILL.md) is an [Agent Skill](https://agentskills.io): a `SKILL.md` folder that teaches Claude Code, Codex, Cursor and other agents to move a project's keys into Keystub with the CLI alone. `keystub keys scan .env` finds the keys by name, `keys add … --from-env VAR --env-file .env` saves each one from the file, and `tokens create … --write-env .env --base-urls --yes` puts a token where the keys were (after the user agrees; the old file is copied to `~/.keystub/backups`), so the agent sees neither a key nor the token. Its rules: no key's value in an argument or on screen, `--json` everywhere, and the user asked before anything is deleted. Its command guide, `references/cli-guide.md`, is a copy of [docs/llms.txt](docs/llms.txt), and the tests check that the two match and that every `keystub` command line in either one parses with the CLI.
+
+An agent starts with `keystub status --json`: one call says who is signed in, this folder's environment, its services and live tokens, which variables in `.env` still hold a real key (by name), and `next`, the command to run next. The skill's Decide section says which token, key and environment to pick. `install.sh` asks whether to install the skill and refreshes a copy installed before; `keystub doctor` and `keystub status` say when an installed copy is older than the CLI.
 
 Install it in any of these ways.
 

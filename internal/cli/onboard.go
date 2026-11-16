@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/vivekverma239/keystub/skills"
 )
 
 // keystub init and keystub doctor: a project's setup in one step, and a
@@ -637,6 +640,18 @@ func (c *ctx) doctor(args []string) error {
 			return &Error{Code: ExitError, Message: "some checks failed"}
 		}
 		return err
+	}
+
+	// An installed skill older than this CLI teaches the agent stale commands.
+	home := c.Getenv("HOME")
+	if home == "" {
+		home, _ = os.UserHomeDir()
+	}
+	project, _ := filepath.Abs(filepath.Dir(file))
+	for _, s := range skills.Installed(home, project) {
+		if !s.Current {
+			add("agent skill", "warn", "%s doesn't match this CLI's skill: keystub skill install (ask the user first), then start a new agent session", s.Path)
+		}
 	}
 
 	var me map[string]any

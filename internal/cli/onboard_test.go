@@ -270,3 +270,98 @@ func TestDefaultEnv(t *testing.T) {
 		}
 	}
 }
+
+func TestStatus(t *testing.T) {
+	r := newRig(t)
+	path := writeDotenv(t, "Shop", "OPENAI_API_KEY=sk-real-openai\nANTHROPIC_API_KEY=sk-ant-real\nPORT=3000\n")
+	r.env["HOME"] = r.home
+
+	// Before anything is set up: the environment isn't made, init is next.
+	st := r.must("", "status", "--env-file", path, "--json").json(t)
+	if st["signedIn"] != true || st["envExists"] != false || st["env"] != "shop/dev" {
+		t.Fatalf("status: %v", st)
+	}
+	file := st["file"].(map[string]any)
+	if got := strings.Join(toStrings(file["realKeys"]), ","); got != "ANTHROPIC_API_KEY,OPENAI_API_KEY" {
+		t.Errorf("realKeys %s", got)
+	}
+	if next := strings.Join(toStrings(st["next"]), "\n"); !strings.Contains(next, "keystub init") || !strings.Contains(next, "--dry-run") {
+		t.Errorf("next: %s", next)
+	}
+
+	// After init, the keys are linked but still in the file: setup is next.
+	r.must("", "init", "--env-file", path, "--yes", "--json")
+	res := r.must("", "status", "--env-file", path, "--json")
+	if strings.Contains(res.stdout, "sk-real") || strings.Contains(res.stdout, "sk-ant") {
+		t.Fatal("status printed a value")
+	}
+	st = res.json(t)
+	if st["envExists"] != true || len(st["services"].([]any)) != 2 {
+		t.Fatalf("status after init: %v", st)
+	}
+	if next := strings.Join(toStrings(st["next"]), "\n"); !strings.Contains(next, "keystub setup") || strings.Contains(next, "keystub init") {
+		t.Errorf("next after init: %s", next)
+	}
+
+	// A token for some services shows what it covers.
+	r.must("", "tokens", "create", "shop/dev", "--name", "pair", "--service", "openai,anthropic", "--json")
+	st = r.must("", "status", "--env-file", path, "--json").json(t)
+	toks := st["tokens"].([]any)
+	var pair map[string]any
+	for _, x := range toks {
+		if m := x.(map[string]any); m["name"] == "pair" {
+			pair = m
+		}
+	}
+	if pair == nil || len(pair["covers"].([]any)) != 2 {
+		t.Fatalf("tokens: %v", toks)
+	}
+
+	// Signed out: no error, and the next step is to sign in.
+	delete(r.env, "KEYSTUB_API_KEY")
+	res = r.run("", "status", "--env-file", path, "--json")
+	if res.code != 0 {
+		t.Fatalf("signed out: exit %d %s", res.code, res.stdout+res.stderr)
+	}
+	if st = res.json(t); st["signedIn"] != false || !strings.Contains(strings.Join(toStrings(st["next"]), ""), "keystub login") {
+		t.Errorf("signed out: %v", st)
+	}
+	if f := st["file"].(map[string]any); f["realKeys"] != nil {
+		t.Errorf("signed out, realKeys should be unknown (null): %v", f["realKeys"])
+	}
+
+	// A server that doesn't answer: still a report, with the reason.
+	r.env["KEYSTUB_API_KEY"] = "admintoken"
+	r.env["KEYSTUB_SERVER"] = "http://127.0.0.1:1"
+	res = r.run("", "status", "--env-file", path, "--json")
+	if st = res.json(t); res.code != 0 || st["signedIn"] != false || st["signInError"] == nil {
+		t.Errorf("unreachable server: %d %v", res.code, st)
+	}
+}
+
+func TestStatusNamesANonDefaultEnvironment(t *testing.T) {
+	r := newRig(t)
+	path := writeDotenv(t, "Shop", "OPENAI_API_KEY=sk-real-openai\n")
+	r.env["HOME"] = r.home
+	r.must("", "init", "shop/staging", "--env-file", path, "--yes", "--json")
+	st := r.must("", "status", "--env-file", path, "--json").json(t)
+	if st["env"] != "shop/staging" {
+		t.Fatalf("env %v", st["env"])
+	}
+	next := strings.Join(toStrings(st["next"]), "\n")
+	if !strings.Contains(next, "shop/staging") || strings.Contains(next, "keystub init") {
+		t.Errorf("next after init of shop/staging: %s", next)
+	}
+}
+
+func TestStatusServiceWithNoBaseURL(t *testing.T) {
+	r := newRig(t)
+	path := writeDotenv(t, "Tool", "GITHUB_TOKEN=ghp_realrealreal\n")
+	r.env["HOME"] = r.home
+	r.must("", "init", "--env-file", path, "--yes", "--json")
+	st := r.must("", "status", "--env-file", path, "--json").json(t)
+	next := strings.Join(toStrings(st["next"]), "\n")
+	if strings.Contains(next, "keystub setup") || strings.Contains(next, "keystub init") || !strings.Contains(next, "keystub run --env tool/dev") {
+		t.Fatalf("next for a key with no base URL: %s", next)
+	}
+}

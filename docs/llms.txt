@@ -18,6 +18,14 @@ Rules for agents:
   that .env file instead and isn't printed at all.
 - Writing a .env file asks first (--yes when nothing can ask) and copies
   the old file to ~/.keystub/backups before changing it.
+- Start with `keystub status --json`: who is signed in, this folder's
+  environment, its services and live tokens, which variables in .env still
+  hold a real key (names only), and "next", the command to run next.
+- Send a token only where the service reads its key: Authorization, the
+  service's own auth header, or for a service that takes its key in the URL
+  (Google Maps, Telegram, Mapbox…) that query parameter or path. A token in
+  another header or part of the URL is refused; bodies aren't checked, so
+  never put a token in one.
 
 The short way, for a project with a .env file:
    curl -fsSL https://raw.githubusercontent.com/vivekverma239/keystub/main/install.sh | sh
@@ -30,6 +38,7 @@ The short way, for a project with a .env file:
                                        the real keys, each SDK's base URL on the edge, and the
                                        secrets; a token for this folder, kept, never printed)
    keystub doctor --json              (checks sign-in, links, the .env file, and the token)
+   keystub status --json              (what is set up here, and "next": what to do next)
    init reads .env in this folder (else .env.local, else the names in
    .env.example, else the variables the code reads) and uses the
    environment <folder>/dev, which it writes to .keystub.json for setup and
@@ -40,6 +49,10 @@ The short way, for a project with a .env file:
    that key, the one linked most, and doesn't save the file's; otherwise it
    saves the file's as "personal". --key-name NAME uses or saves that name
    instead. It leaves services the environment already links as they are.
+   It never saves a long-lived AWS key from the file: Keystub mints short-lived
+   AWS credentials from a key saved in the dashboard, so init links that key or
+   says to add one. Where the account has a short-lived Fly.io or Cloudflare key
+   saved, init links it instead of a stand-in.
 The steps below do the same one at a time.
 
 1. Sign in.
@@ -73,8 +86,10 @@ The steps below do the same one at a time.
    keystub envs links my-app/dev
 
 6. Make a token for the sandbox. With no --service it covers every service
-   the environment links; --ttl makes it expire.
+   the environment links; --service (repeat it, or a comma list) limits it to
+   those; --ttl makes it expire.
    TOKEN=$(keystub tokens create my-app/dev --name sandbox-1 --ttl 2h)
+   TOKEN=$(keystub tokens create my-app/dev --name ci --service openai --service anthropic --ttl 1d)
    or straight into a .env file, where the real keys were (and, with
    --base-urls, each SDK's base URL on the edge). It asks first, and copies
    the old file to ~/.keystub/backups:
@@ -90,7 +105,10 @@ In a sandbox or CI job:
    keystub tokens create my-app/dev --name ci --ttl 1d --delivery
                                       (on your machine: KEYSTUB_TOKEN, KEYSTUB_DELIVERY_KEY and
                                        KEYSTUB_EDGE, for the sandbox's environment)
-   keystub setup --json               (in the sandbox: writes .env, ~/.keystub/env.sh, gcloud)
+   keystub setup --json               (in the sandbox: writes .env, ~/.keystub/env.sh, gcloud,
+                                       and the AWS credentials file)
+   Minted credentials (Google Cloud, AWS) and secrets come only with a token for
+   every service and a delivery key; a token for some services gets stand-ins only.
 
 Later:
 - Rotate a key everywhere it is linked: keystub keys replace team --service openai --from-env NEW_KEY
