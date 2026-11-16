@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,7 +15,7 @@ import (
 	"github.com/vivekverma239/keystub/skills"
 )
 
-const statusUsage = "status [PROJECT/ENV] [--env-file FILE]"
+const statusUsage = "status [PROJECT/ENV] [--env-file FILE] [--json]"
 
 // statusService is one service the environment links.
 type statusService struct {
@@ -36,16 +38,19 @@ type statusToken struct {
 
 // statusFile is what the env file holds, by name only.
 type statusFile struct {
-	Path     string   `json:"path"`
-	Exists   bool     `json:"exists"`
-	RealKeys []string `json:"realKeys"` // variables a service reads that still hold a real key; null until signed in (the catalog says which)
-	Tokens   []string `json:"tokens"`   // variables that hold a Keystub token
+	Path   string `json:"path"`
+	Exists bool   `json:"exists"`
+	// Variables a service reads that still hold a real key; null when it
+	// can't be told (signed out, or the catalog didn't answer).
+	RealKeys []string `json:"realKeys"`
+	Tokens   []string `json:"tokens"` // variables that hold a Keystub token
 }
 
 // status gathers, in one answer, what an agent needs before it decides
 // anything: who is signed in, this folder's environment, its services and
 // live tokens, what the env file holds, the skill, and what to do next.
-// It changes nothing, and a missing piece is reported, not an error.
+// It changes nothing and prints no value; a missing piece is reported, not
+// an error.
 func (c *ctx) status(args []string) error {
 	p, err := parse(args, []string{"env-file"}, nil)
 	if err != nil {
@@ -70,20 +75,36 @@ func (c *ctx) status(args []string) error {
 	if err != nil {
 		return err
 	}
-	out := map[string]any{"server": c.server, "env": env}
-	var next []string
-	envFlag := ""
-	if len(p.args) == 1 || p.flags["env-file"] != "" {
-		envFlag = " " + env
-		if p.flags["env-file"] != "" {
-			envFlag += " --env-file " + shellQuote(file)
+	// The arguments the suggested commands need to land on the same
+	// environment and file: init and doctor don't read .keystub.json.
+	var target []string
+	if env != defaultEnv(file) {
+		target = append(target, env)
+	}
+	if p.flags["env-file"] != "" {
+		target = append(target, "--env-file", file)
+	}
+	suggest := func(cmd string, more ...string) string {
+		words := append(append([]string{"keystub", cmd}, target...), more...)
+		for i, w := range words {
+			words[i] = shellQuote(w)
 		}
+		return strings.Join(words, " ")
 	}
 
-	// The env file, by names only: no value leaves this function.
-	sf := statusFile{Path: file, RealKeys: []string{}, Tokens: []string{}}
+	out := map[string]any{"server": c.server, "env": env}
+	var next []string
+
+	// The env file, by names only: no value leaves this function. Tokens
+	// show by their prefix; which variables are keys needs the catalog.
+	sf := statusFile{Path: file, Tokens: []string{}}
 	names, values, ferr := dotenvNames(file)
 	sf.Exists = ferr == nil
+	for _, n := range names {
+		if holdsToken(values[n]) {
+			sf.Tokens = append(sf.Tokens, n)
+		}
+	}
 
 	var me struct {
 		User    map[string]any `json:"user"`
@@ -91,54 +112,47 @@ func (c *ctx) status(args []string) error {
 	}
 	signedIn := true
 	if err := c.call("GET", "/api/me", nil, &me); err != nil {
-		var ce *Error
-		if !errors.As(err, &ce) || ce.Code != ExitNoAuth {
-			return err
-		}
+		// Signed out, a key with no server named, or a server that
+		// doesn't answer: all reported, so the agent gets a next step.
 		signedIn = false
+		out["signInError"] = err.Error()
+		var ce *Error
+		if errors.As(err, &ce) && ce.Code == ExitNoAuth {
+			next = append(next, "keystub login --json (a person approves it in the browser); with no browser, set KEYSTUB_API_KEY and KEYSTUB_SERVER")
+		} else {
+			next = append(next, "fix the sign-in first: "+err.Error())
+		}
 	}
 	out["signedIn"] = signedIn
-	if !signedIn {
-		// Which variable is a key needs the catalog; tokens show by their prefix.
-		sf.RealKeys = nil
-		for _, n := range names {
-			if holdsToken(values[n]) {
-				sf.Tokens = append(sf.Tokens, n)
-			}
-		}
-		out["file"] = sf
-		next = append(next, "keystub login --json (a person approves it in the browser); with no browser, set KEYSTUB_API_KEY and KEYSTUB_SERVER")
-	} else {
+	if signedIn {
 		if me.User != nil {
 			out["user"] = me.User["login"]
 		}
 		if me.Account != nil {
 			out["account"] = me.Account["name"]
 		}
-		next = c.statusEnv(out, path, env, envFlag, names, values, &sf)
+		next = c.statusEnv(out, path, env, names, values, &sf, suggest, p.args, p.flags["env-file"])
 	}
-	if ferr == nil {
-		sort.Strings(sf.RealKeys)
-		sort.Strings(sf.Tokens)
-	}
+	sort.Strings(sf.RealKeys)
+	sort.Strings(sf.Tokens)
+	out["file"] = sf
 
-	// The skill, wherever it is installed.
+	// The skill, wherever it is installed, for every project or this one.
 	home := c.Getenv("HOME")
 	if home == "" {
 		home, _ = os.UserHomeDir()
 	}
-	cwd, _ := os.Getwd()
-	copies := skills.Installed(home, cwd)
+	project, _ := filepath.Abs(filepath.Dir(file))
+	copies := skills.Installed(home, project)
 	if copies == nil {
 		copies = []skills.Copy{}
 	}
 	out["skill"] = copies
-	stale := false
 	for _, s := range copies {
-		stale = stale || !s.Current
-	}
-	if stale {
-		next = append(next, "keystub skill install (an installed copy of the Keystub skill is older than this CLI; start a new agent session after)")
+		if !s.Current {
+			next = append(next, "ask the user, then: keystub skill install (an installed Keystub skill doesn't match this CLI; start a new agent session after)")
+			break
+		}
 	}
 	if next == nil {
 		next = []string{}
@@ -167,12 +181,13 @@ func (c *ctx) status(args []string) error {
 		if toks, ok := out["tokens"].([]statusToken); ok {
 			fmt.Fprintf(w, "Tokens       %d live\n", len(toks))
 		}
-		if sf.Exists {
-			if sf.RealKeys == nil {
-				fmt.Fprintf(w, "%-12s %d tokens (real keys: sign in to check)\n", file, len(sf.Tokens))
-			} else {
-				fmt.Fprintf(w, "%-12s %d real keys, %d tokens\n", file, len(sf.RealKeys), len(sf.Tokens))
-			}
+		switch {
+		case !sf.Exists:
+			fmt.Fprintf(w, "%-12s not there\n", file)
+		case sf.RealKeys == nil:
+			fmt.Fprintf(w, "%-12s %d tokens (real keys: can't tell yet)\n", file, len(sf.Tokens))
+		default:
+			fmt.Fprintf(w, "%-12s %d real keys, %d tokens\n", file, len(sf.RealKeys), len(sf.Tokens))
 		}
 		for _, n := range next {
 			fmt.Fprintln(w, "Next:", n)
@@ -181,31 +196,46 @@ func (c *ctx) status(args []string) error {
 }
 
 // statusEnv fills in the environment, its services and tokens, and the
-// file's variables, and says what to do next.
-func (c *ctx) statusEnv(out map[string]any, path, env, envFlag string, names []string, values map[string]string, sf *statusFile) []string {
+// file's real keys, and says what to do next.
+func (c *ctx) statusEnv(out map[string]any, path, env string, names []string, values map[string]string, sf *statusFile, suggest func(string, ...string) string, envArgs []string, envFile string) []string {
 	var next []string
 	var ls struct {
 		Links []link `json:"links"`
 	}
-	exists := c.call("GET", path+"/links", nil, &ls) == nil
+	exists := true
+	if err := c.call("GET", path+"/links", nil, &ls); err != nil {
+		var ce *Error
+		if !errors.As(err, &ce) || ce.Code != ExitNotFound {
+			out["envError"] = err.Error()
+			return append(next, "couldn't read "+env+": "+err.Error()+"; try again")
+		}
+		exists = false
+	}
 	out["envExists"] = exists
 
+	// Each service's kind: the catalog's, then the account's own.
 	kinds := map[string]string{}
-	var added struct {
-		Services []service `json:"services"`
-	}
-	if c.call("GET", "/api/services", nil, &added) == nil {
-		for _, s := range added.Services {
-			kinds[s.ID] = s.Kind
+	for _, route := range []string{"/api/catalog", "/api/services"} {
+		var list struct {
+			Services []service `json:"services"`
+		}
+		if c.call("GET", route, nil, &list) == nil {
+			for _, s := range list.Services {
+				if s.Kind != "" {
+					kinds[s.ID] = s.Kind
+				}
+			}
 		}
 	}
-	linked := map[string]bool{}
 	svcs := []statusService{}
+	standIns := 0
 	for _, l := range ls.Links {
-		linked[l.Service] = true
 		k := kinds[l.Service]
 		if k == "" {
 			k = "stand-in"
+		}
+		if k == "stand-in" {
+			standIns++
 		}
 		svcs = append(svcs, statusService{ID: l.Service, Kind: k, Key: l.Key.Name})
 	}
@@ -228,39 +258,47 @@ func (c *ctx) statusEnv(out map[string]any, path, env, envFlag string, names []s
 	}
 	out["tokens"] = toks
 
-	// Which variables still hold a real key, and which a token.
-	unlinked := false
+	// Which variables still hold a real key.
 	if sf.Exists {
-		reads, err := c.readers()
-		if err == nil {
+		if reads, err := c.readers(); err == nil {
+			sf.RealKeys = []string{}
 			for _, n := range names {
-				r, ok := reads[n]
-				v := values[n]
-				switch {
-				case holdsToken(v):
-					sf.Tokens = append(sf.Tokens, n)
-				case ok && v != "":
+				if _, ok := reads[n]; ok && values[n] != "" && !holdsToken(values[n]) {
 					sf.RealKeys = append(sf.RealKeys, n)
-					unlinked = unlinked || !linked[r.service.ID]
 				}
 			}
 		}
 	}
-	out["file"] = sf
+
+	// Whether init has anything left to do: its own plan says, so a
+	// variable init leaves alone (a template, AWS with no saved key) never
+	// sends the agent round in circles.
+	initChanges := !exists
+	if exists {
+		var buf bytes.Buffer
+		sub := *c
+		sub.json, sub.Stdout, sub.Stderr = true, &buf, io.Discard
+		args := append(append([]string{}, envArgs...), "--dry-run")
+		if envFile != "" {
+			args = append(args, "--env-file", envFile)
+		}
+		var plan struct {
+			Changes bool `json:"changes"`
+		}
+		if sub.initEnv(args) == nil && json.Unmarshal(buf.Bytes(), &plan) == nil {
+			initChanges = plan.Changes
+		}
+	}
 
 	switch {
-	case !exists && len(sf.RealKeys) > 0:
-		next = append(next, fmt.Sprintf("keystub init%s --dry-run --json, show the user the plan, and on their yes run it with --yes", envFlag))
-	case !exists:
-		next = append(next, fmt.Sprintf("keystub init%s --dry-run --json (it reads the variables the code uses when there's no .env), or keystub envs add %s --json", envFlag, env))
-	case unlinked:
-		next = append(next, fmt.Sprintf("keystub init%s --dry-run --json: %s has real keys for services %s doesn't link yet", envFlag, sf.Path, env))
-	case len(sf.RealKeys) > 0:
-		next = append(next, fmt.Sprintf("keystub setup%s --dry-run --json, then ask the user before writing tokens in place of the real keys", envFlag))
+	case initChanges:
+		next = append(next, suggest("init", "--dry-run", "--json")+" (the plan; it changes nothing), show the user, and on their yes run it with --yes")
 	case len(svcs) == 0:
-		next = append(next, fmt.Sprintf("link a saved key: keystub keys list --json, then keystub envs link %s SERVICE KEY --no-token --json", env))
-	case sf.Exists && len(sf.Tokens) > 0:
-		next = append(next, fmt.Sprintf("keystub doctor%s --json checks the tokens work", envFlag))
+		next = append(next, "link a saved key: keystub keys list --json, then keystub envs link "+env+" SERVICE KEY --no-token --json")
+	case len(sf.RealKeys) > 0, !sf.Exists && standIns > 0:
+		next = append(next, suggest("setup", "--dry-run", "--json")+", then ask the user before writing tokens in place of the real keys")
+	case len(sf.Tokens) > 0:
+		next = append(next, suggest("doctor", "--json")+" (checks each token works)")
 	}
 	for _, t := range toks {
 		if t.ExpiresAt == nil && t.Delivery {

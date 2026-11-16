@@ -58,7 +58,7 @@ func Meta(skillMD []byte) (name, description string, err error) {
 // Copy is an installed copy of the skill.
 type Copy struct {
 	Path    string `json:"path"`
-	Current bool   `json:"current"` // the same files as this binary's skill
+	Current bool   `json:"current"` // the same files as this binary's skill; false: older or newer
 }
 
 // Places lists the folders an installed skill may be in: under the home
@@ -71,7 +71,7 @@ func Places(home, cwd string) []string {
 			out = append(out, filepath.Join(home, filepath.FromSlash(p)))
 		}
 	}
-	if cwd != "" && cwd != home {
+	if cwd != "" && !same(cwd, home) {
 		for _, p := range []string{".claude/skills", ".agents/skills"} {
 			out = append(out, filepath.Join(cwd, filepath.FromSlash(p)))
 		}
@@ -84,8 +84,15 @@ func Places(home, cwd string) []string {
 // Keystub skill is left out.
 func Installed(home, cwd string) []Copy {
 	var out []Copy
+	seen := map[string]bool{}
 	for _, parent := range Places(home, cwd) {
 		dir := filepath.Join(parent, Name)
+		// One copy reached two ways (a symlinked home, a linked folder) counts once.
+		real, err := filepath.EvalSymlinks(dir)
+		if err != nil || seen[real] {
+			continue
+		}
+		seen[real] = true
 		b, err := os.ReadFile(filepath.Join(dir, "SKILL.md"))
 		if err != nil {
 			continue
@@ -114,4 +121,14 @@ func Same(dir fs.FS) bool {
 		return nil
 	})
 	return same
+}
+
+// same reports whether two paths name the same folder.
+func same(a, b string) bool {
+	ra, err1 := filepath.EvalSymlinks(a)
+	rb, err2 := filepath.EvalSymlinks(b)
+	if err1 != nil || err2 != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	return ra == rb
 }

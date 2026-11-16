@@ -299,7 +299,7 @@ func TestStatus(t *testing.T) {
 	if st["envExists"] != true || len(st["services"].([]any)) != 2 {
 		t.Fatalf("status after init: %v", st)
 	}
-	if next := strings.Join(toStrings(st["next"]), "\n"); !strings.Contains(next, "keystub setup") {
+	if next := strings.Join(toStrings(st["next"]), "\n"); !strings.Contains(next, "keystub setup") || strings.Contains(next, "keystub init") {
 		t.Errorf("next after init: %s", next)
 	}
 
@@ -328,5 +328,27 @@ func TestStatus(t *testing.T) {
 	}
 	if f := st["file"].(map[string]any); f["realKeys"] != nil {
 		t.Errorf("signed out, realKeys should be unknown (null): %v", f["realKeys"])
+	}
+
+	// A server that doesn't answer: still a report, with the reason.
+	r.env["KEYSTUB_API_KEY"] = "admintoken"
+	r.env["KEYSTUB_SERVER"] = "http://127.0.0.1:1"
+	res = r.run("", "status", "--env-file", path, "--json")
+	if st = res.json(t); res.code != 0 || st["signedIn"] != false || st["signInError"] == nil {
+		t.Errorf("unreachable server: %d %v", res.code, st)
+	}
+}
+
+func TestStatusNamesANonDefaultEnvironment(t *testing.T) {
+	r := newRig(t)
+	path := writeDotenv(t, "Shop", "OPENAI_API_KEY=sk-real-openai\n")
+	r.env["HOME"] = r.home
+	r.must("", "init", "shop/staging", "--env-file", path, "--yes", "--json")
+	st := r.must("", "status", "--env-file", path, "--json").json(t)
+	if st["env"] != "shop/staging" {
+		t.Fatalf("env %v", st["env"])
+	}
+	if next := strings.Join(toStrings(st["next"]), "\n"); !strings.Contains(next, "shop/staging") {
+		t.Errorf("next doesn't name the environment: %s", next)
 	}
 }

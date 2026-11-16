@@ -126,3 +126,18 @@ func TestInstalledSaysWhetherACopyIsCurrent(t *testing.T) {
 		t.Fatalf("someone else's folder: %v", got)
 	}
 }
+
+func TestInstalledCountsALinkedCopyOnce(t *testing.T) {
+	home := t.TempDir()
+	dir := filepath.Join(home, ".agents", "skills", Name)
+	if err := os.CopyFS(dir, Keystub); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.MkdirAll(filepath.Join(home, ".claude", "skills"), 0o755)
+	if err := os.Symlink(dir, filepath.Join(home, ".claude", "skills", Name)); err != nil {
+		t.Fatal(err)
+	}
+	if got := Installed(home+"/", home); len(got) != 1 {
+		t.Fatalf("one copy, linked: %v", got)
+	}
+}

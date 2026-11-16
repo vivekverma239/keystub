@@ -23,8 +23,9 @@ Rules for agents:
   hold a real key (names only), and "next", the command to run next.
 - Send a token only where the service reads its key: Authorization, the
   service's own auth header, or for a service that takes its key in the URL
-  (Google Maps, Telegram, Mapbox…) that query parameter or path. A token
-  anywhere else (another header, another part of the URL) is refused.
+  (Google Maps, Telegram, Mapbox…) that query parameter or path. A token in
+  another header or part of the URL is refused; bodies aren't checked, so
+  never put a token in one.
 
 The short way, for a project with a .env file:
    curl -fsSL https://raw.githubusercontent.com/vivekverma239/keystub/main/install.sh | sh

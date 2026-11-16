@@ -46,7 +46,8 @@ live `tokens` and what each `covers` (null: every service), which variables
 in the env file still hold a real key (`file.realKeys`, names only; null
 until signed in), the
 installed skill copies (`skill`), and `next`: the command to run next. It
-changes nothing and never prints a value. `--env-file FILE` and
+changes nothing and never prints a value. When it can't sign in,
+`signedIn` is false and `signInError` says why. `--env-file FILE` and
 `PROJECT/ENV` pick others.
 
 ## Rules
@@ -75,8 +76,8 @@ Follow these every time.
 6. **Send a token only where the service reads its key**: `Authorization`,
    the service's own auth header, or, for a service that takes its key in the
    URL (Google Maps, Telegram, Mapbox and others), that query parameter or
-   path. Keystub refuses a token anywhere else, such as a second header or
-   another part of the URL, so a stray copy can't leak.
+   path. Keystub refuses a token in any other header or part of the URL.
+   It doesn't look in request bodies: never put a token in one, or in a log.
 
 Exit codes: 0 ok, 1 error, 2 usage (a bad command, or a delete without
 `--yes`), 3 not signed in, 4 not found, 5 conflict (a name that is taken,
@@ -306,9 +307,10 @@ A proxy token works only on its way through Keystub. Pick one:
   `keystub envs delete my-app/dev --yes --json` revokes its tokens.
 
 - **Keep this skill current:** when `keystub status --json` lists a `skill`
-  copy with `current: false`, or `keystub doctor` warns about it, tell the
-  user and, on their yes, run `keystub skill install`; it takes effect in a
-  new agent session.
+  copy with `current: false` (it doesn't match this CLI's: older, or newer
+  from elsewhere), or `keystub doctor` warns about it, tell the user and, on
+  their yes, run `keystub skill install`; it takes effect in a new agent
+  session.
 
 The full command guide is [references/cli-guide.md](references/cli-guide.md),
 the same text `keystub help agents` prints.

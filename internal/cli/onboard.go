@@ -647,10 +647,10 @@ func (c *ctx) doctor(args []string) error {
 	if home == "" {
 		home, _ = os.UserHomeDir()
 	}
-	cwd, _ := os.Getwd()
-	for _, s := range skills.Installed(home, cwd) {
+	project, _ := filepath.Abs(filepath.Dir(file))
+	for _, s := range skills.Installed(home, project) {
 		if !s.Current {
-			add("agent skill", "warn", "%s is older than this CLI: keystub skill install, then start a new agent session", s.Path)
+			add("agent skill", "warn", "%s doesn't match this CLI's skill: keystub skill install (ask the user first), then start a new agent session", s.Path)
 		}
 	}
 

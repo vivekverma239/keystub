@@ -7,8 +7,8 @@
 # release's checksums, puts it in ~/.local/bin (or $KEYSTUB_INSTALL_DIR),
 # and adds that folder to PATH in your shell's rc file if it isn't there.
 # It then offers to install the Keystub skill for coding agents, or
-# refreshes a copy installed before (KEYSTUB_SKILL=yes or no answers
-# without asking). Set KEYSTUB_VERSION=v0.1.0 for a given release. macOS and Linux; on
+# refreshes a copy installed before. KEYSTUB_SKILL=yes installs it without
+# asking; KEYSTUB_SKILL=no leaves skills alone, installed or not. Set KEYSTUB_VERSION=v0.1.0 for a given release. macOS and Linux; on
 # Windows, download the zip from the releases page.
 set -eu
 
@@ -84,12 +84,19 @@ esac
 # Keystub safely. A copy installed earlier is refreshed to match this
 # release; otherwise ask, or follow KEYSTUB_SKILL=yes|no when set.
 refreshed=""
-for parent in "$HOME/.claude/skills" "$HOME/.agents/skills" "$HOME/.cursor/skills"; do
-  if grep -qs '^name: keystub$' "$parent/keystub/SKILL.md"; then
-    "$DIR/keystub" skill install --dir "$parent" >/dev/null && say "Updated the Keystub skill in $parent/keystub"
-    refreshed=1
-  fi
-done
+case "${KEYSTUB_SKILL:-}" in [Nn]*) refreshed=skip; say "Left the Keystub skill alone (KEYSTUB_SKILL=no); later: keystub skill install" ;; esac
+if [ -z "$refreshed" ]; then
+  for parent in "$HOME/.claude/skills" "$HOME/.agents/skills" "$HOME/.cursor/skills"; do
+    if grep -Eqs '^name:[[:space:]]*keystub[[:space:]]*$' "$parent/keystub/SKILL.md"; then
+      refreshed=1
+      if "$DIR/keystub" skill install --dir "$parent" >/dev/null; then
+        say "Updated the Keystub skill in $parent/keystub"
+      else
+        say "Couldn't update the Keystub skill in $parent/keystub; later: keystub skill install --dir $parent"
+      fi
+    fi
+  done
+fi
 if [ -z "$refreshed" ]; then
   answer=${KEYSTUB_SKILL:-}
   if [ -z "$answer" ] && [ -r /dev/tty ] && [ -w /dev/tty ] && (: </dev/tty) 2>/dev/null; then
