@@ -187,17 +187,34 @@ func globals(args []string) (globalFlags, []string, error) {
 // parsed is a command's flags and positional arguments.
 type parsed struct {
 	flags map[string]string
+	all   map[string][]string // every value of a valued flag, in order, for one given more than once
 	set   map[string]bool
 	args  []string
 }
 
 func (p parsed) has(name string) bool { return p.set[name] }
 
+// list is a valued flag's values, given more than once or separated by
+// commas, without blanks or repeats.
+func (p parsed) list(name string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, v := range p.all[name] {
+		for _, x := range strings.Split(v, ",") {
+			if x = strings.TrimSpace(x); x != "" && !seen[x] {
+				seen[x] = true
+				out = append(out, x)
+			}
+		}
+	}
+	return out
+}
+
 // parse reads a command's own flags. valued lists the flags that take a
 // value; switches those that don't. Anything else starting with - is a
 // usage error.
 func parse(args []string, valued, switches []string) (parsed, error) {
-	p := parsed{flags: map[string]string{}, set: map[string]bool{}}
+	p := parsed{flags: map[string]string{}, all: map[string][]string{}, set: map[string]bool{}}
 	isValued := map[string]bool{}
 	for _, v := range valued {
 		isValued[v] = true
@@ -229,6 +246,7 @@ func parse(args []string, valued, switches []string) (parsed, error) {
 				val = args[i]
 			}
 			p.flags[name], p.set[name] = val, true
+			p.all[name] = append(p.all[name], val)
 		case isSwitch[name] && !hasVal:
 			p.set[name] = true
 		default:

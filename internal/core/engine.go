@@ -1048,7 +1048,8 @@ type TokenSpec struct {
 	EnvID     string
 	Name      string
 	Principal string
-	Service   string // "": an environment token; else a service token for this service, which env must link
+	Service   string   // "": an environment token; else a service token for this service, which env must link
+	Services  []string // instead of Service: a service token for these services, each of which env must link
 	Limits    Limits
 	TTL       time.Duration // 0: no expiry
 }
@@ -1100,15 +1101,40 @@ func (e *Engine) create(ctx context.Context, spec TokenSpec) (string, Token, err
 	if _, ok := e.envLocked(spec.EnvID); !ok {
 		return "", Token{}, fmt.Errorf("environment %q: %w", spec.EnvID, ErrNotFound)
 	}
-	kind := KindEnvironment
+	if spec.Service != "" && len(spec.Services) > 0 {
+		return "", Token{}, errors.New("give a service or a list of services, not both")
+	}
+	list := spec.Services
 	if spec.Service != "" {
-		if _, ok := e.serviceLocked(spec.Service); !ok {
-			return "", Token{}, fmt.Errorf("service %q: %w", spec.Service, ErrNotFound)
+		list = []string{spec.Service}
+	}
+	kind := KindEnvironment
+	var services []string
+	for _, id := range list {
+		if id == "" {
+			return "", Token{}, errors.New("a service ID can't be empty")
 		}
-		if _, ok := e.linkLocked(spec.EnvID, spec.Service); !ok {
-			return "", Token{}, fmt.Errorf("%s in %s: %w", spec.Service, spec.EnvID, ErrNotLinked)
+		if slices.Contains(services, id) {
+			continue
 		}
+		if _, ok := e.serviceLocked(id); !ok {
+			return "", Token{}, fmt.Errorf("service %q: %w", id, ErrNotFound)
+		}
+		if _, ok := e.linkLocked(spec.EnvID, id); !ok {
+			return "", Token{}, fmt.Errorf("%s in %s: %w", id, spec.EnvID, ErrNotLinked)
+		}
+		services = append(services, id)
 		kind = KindService
+	}
+	if spec.Services != nil && len(services) == 0 {
+		return "", Token{}, errors.New("the list of services is empty: leave it out for an environment token")
+	}
+	first := ""
+	if len(services) > 0 {
+		first = services[0]
+	}
+	if len(services) < 2 {
+		services = nil
 	}
 	if e.tokenNameTakenLocked(spec.EnvID, spec.Name) {
 		return "", Token{}, ErrNameTaken
@@ -1125,7 +1151,7 @@ func (e *Engine) create(ctx context.Context, spec TokenSpec) (string, Token, err
 	}
 	t := Token{
 		ID: "tk_" + hex.EncodeToString(b[18:]), Name: spec.Name, EnvID: spec.EnvID,
-		Principal: spec.Principal, Kind: kind, Service: spec.Service, Limits: spec.Limits, ExpiresAt: expires,
+		Principal: spec.Principal, Kind: kind, Service: first, Services: services, Limits: spec.Limits, ExpiresAt: expires,
 		TokenHash: hashToken(secret), Token: sealed, CreatedAt: now,
 	}
 	if err := e.repo.PutToken(ctx, t); err != nil {

@@ -827,3 +827,39 @@ func TestLimitsKeepLevelsNotNamed(t *testing.T) {
 		t.Fatalf("envs limits printed %q", out)
 	}
 }
+
+func TestTokenForSeveralServices(t *testing.T) {
+	r := newRig(t)
+	for _, s := range []string{"echo", "other", "third"} {
+		r.must("", "services", "add", s, "--hosts", "api."+s+".test")
+		r.must("real-"+s+"\n", "keys", "add", s, "--name", "team")
+	}
+	r.must("", "envs", "add", "app/dev")
+	for _, s := range []string{"echo", "other", "third"} {
+		r.must("", "envs", "link", "app/dev", s, "team", "--no-token")
+	}
+	made := r.must("", "tokens", "create", "app/dev", "--name", "pair", "--service", "echo", "--service", "other", "--json").json(t)
+	if made["kind"] != "service" || fmt.Sprint(made["services"]) != "[echo other]" {
+		t.Fatalf("token JSON = %v", made)
+	}
+	tok := made["token"].(string)
+	for _, s := range []string{"echo", "other"} {
+		if st, got := r.call(s, tok); st != 200 || got != "real-"+s {
+			t.Fatalf("%s: %d %q", s, st, got)
+		}
+	}
+	if st, _ := r.call("third", tok); st != 403 {
+		t.Fatalf("third: %d", st)
+	}
+	// Commas work too, and the list shows both.
+	r.must("", "tokens", "create", "app/dev", "--name", "pair2", "--service", "echo,third")
+	if out := r.must("", "tokens", "list", "app/dev").stdout; !strings.Contains(out, "echo,other") || !strings.Contains(out, "echo,third") {
+		t.Fatalf("list = %s", out)
+	}
+	if res := r.run("", "tokens", "create", "app/dev", "--name", "x", "--service", ","); res.code != ExitUsage {
+		t.Fatalf("empty --service: %d %s", res.code, res.stderr)
+	}
+	if res := r.run("", "tokens", "create", "app/dev", "--name", "x", "--service", "echo", "--service", "nope"); res.code != ExitNotFound {
+		t.Fatalf("unknown service in the list: %d %s", res.code, res.stderr)
+	}
+}

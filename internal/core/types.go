@@ -371,7 +371,8 @@ type Token struct {
 	EnvID     string     `json:"envId"`
 	Principal string     `json:"principal,omitempty"` // who it was issued to, e.g. "machine:devbox-1"
 	Kind      string     `json:"kind"`                // KindEnvironment or KindService
-	Service   string     `json:"service,omitempty"`   // a service token's one service
+	Service   string     `json:"service,omitempty"`   // a service token's first (or only) service
+	Services  []string   `json:"services,omitempty"`  // a service token's services, when it has more than one; older versions read Service alone, allowing less, never more
 	Limits    Limits     `json:"limits,omitzero"`
 	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
 	TokenHash string     `json:"tokenHash"` // SHA-256 of the token, for lookup
@@ -482,13 +483,16 @@ func (t Token) Expired(now time.Time) bool { return t.ExpiresAt != nil && !now.B
 func (t Token) Usable(now time.Time) bool { return !t.Revoked() && !t.Expired(now) }
 
 // Allows reports whether the token may call serviceID, if its environment
-// links it: a service token only its own service. Any other kind (one a
+// links it: a service token only its own services. Any other kind (one a
 // later version wrote, say) allows nothing.
 func (t Token) Allows(serviceID string) bool {
 	switch t.Kind {
 	case KindEnvironment:
 		return true
 	case KindService:
+		if len(t.Services) > 0 {
+			return slices.Contains(t.Services, serviceID)
+		}
 		return t.Service == serviceID
 	}
 	return false

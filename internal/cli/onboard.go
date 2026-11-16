@@ -477,7 +477,7 @@ func (c *ctx) makeEnv(env string) error {
 // with base URLs on the edge with --base-urls, after keeping a copy of
 // the file.
 func (c *ctx) initWrite(plan *initPlan, path string) error {
-	tf, err := c.planTokenFile(path, "", plan.BaseURLs)
+	tf, err := c.planTokenFile(path, nil, plan.BaseURLs)
 	if err != nil {
 		return err
 	}
