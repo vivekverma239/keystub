@@ -29,6 +29,10 @@ type Entry struct {
 	Auth struct {
 		Header string `json:"header"`
 		Format string `json:"format"`
+		// Query and Path name where in the URL a service reads its key, for
+		// the services that take it there (see core.Service).
+		Query string   `json:"query,omitempty"`
+		Path  []string `json:"path,omitempty"`
 	} `json:"auth"`
 	BaseURL core.BaseURL `json:"baseUrl"`
 	EnvVars []string     `json:"envVars"`
@@ -42,7 +46,7 @@ type Entry struct {
 func (e Entry) Service() core.Service {
 	return core.Service{
 		ID: e.ID, Name: e.Name, Category: e.Category, Docs: e.Docs, Note: e.Note, Hosts: e.Hosts,
-		Header: e.Auth.Header, Format: e.Auth.Format, BaseURL: e.BaseURL, EnvVars: e.EnvVars,
+		Header: e.Auth.Header, Format: e.Auth.Format, Query: e.Auth.Query, Paths: e.Auth.Path, BaseURL: e.BaseURL, EnvVars: e.EnvVars,
 	}
 }
 

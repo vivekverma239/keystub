@@ -31,7 +31,7 @@ A saved key is counted only while it has a limit: one with none shows "Not count
 
 Checks run in this order, and only a request that passes all of them is counted:
 
-1. A token outside the auth headers → 400.
+1. A token outside the auth headers (or, in the URL, outside the service's key spot) → 400.
 2. Unknown, revoked or expired token → 401; service not allowed → 403.
 3. No saved key linked for the service in the token's environment → 502; the key can't be decrypted → 500.
 4. Limits. If any level is full, the request gets 429 naming that level (`daily limit reached for token ci`, `per-minute limit reached for environment my-app/prod`, `daily limit reached for the saved key for openai`: the service, since the token's holder needn't know the key's name), and no level counts it.

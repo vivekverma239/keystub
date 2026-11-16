@@ -128,6 +128,7 @@ func (l Limits) Validate() error {
 var (
 	idPattern     = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 	envVarPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	queryPattern  = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 	hostPattern   = regexp.MustCompile(`^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$`)
 )
 
@@ -186,6 +187,14 @@ type Service struct {
 	// token: Header: Format. They default to "Authorization: Bearer {key}".
 	Header string `json:"header"`
 	Format string `json:"format"`
+	// Query names the one query parameter a service reads its key from
+	// (Mapbox's access_token); a token there is swapped too. Paths are
+	// path prefixes with the key in them ("/bot{key}/" for Telegram); a
+	// token in that spot is swapped. A token anywhere else in the URL is
+	// refused, and for a service with either, the real key is scrubbed
+	// from responses (see internal/swap).
+	Query string   `json:"query,omitempty"`
+	Paths []string `json:"paths,omitempty"`
 	// BaseURL is the variable an SDK reads to send its calls somewhere else,
 	// for quick start (no proxy, no CA): OPENAI_BASE_URL with path "/v1".
 	BaseURL BaseURL `json:"baseUrl,omitzero"`
@@ -258,6 +267,17 @@ func (s *Service) Validate() error {
 	}
 	if !strings.Contains(s.Format, "{key}") {
 		return errors.New(`format must contain "{key}"`)
+	}
+	s.Query = strings.TrimSpace(s.Query)
+	if s.Query != "" && !queryPattern.MatchString(s.Query) {
+		return fmt.Errorf("%q isn't a query parameter name (letters, digits, - . _)", s.Query)
+	}
+	s.Paths = slices.Clone(s.Paths)
+	for _, p := range s.Paths {
+		pre, post, ok := strings.Cut(p, "{key}")
+		if !ok || strings.Contains(post, "{key}") || !strings.HasPrefix(p, "/") || !strings.HasSuffix(p, "/") || strings.ContainsAny(pre+post, "?#%") {
+			return fmt.Errorf(`path %q must start and end with "/" and hold "{key}" once`, p)
+		}
 	}
 	if s.BaseURL.Var != "" && !envVarPattern.MatchString(s.BaseURL.Var) {
 		return fmt.Errorf("%q isn't a valid env var name", s.BaseURL.Var)

@@ -295,8 +295,9 @@ var hopHeaders = []string{"Connection", "Keep-Alive", "Proxy-Authorization", "Pr
 func (p *Proxy) forward(conn net.Conn, br *bufio.Reader, req *http.Request, host, target string, svc core.Service, proxyToken string) bool {
 	ctx := context.Background()
 	start := time.Now()
-	entry := core.Entry{Time: start.UTC(), Service: svc.ID, Method: req.Method, Host: host, Path: req.URL.Path}
-	var meter *usage.Meter // reads usage from the response, when the proxy swaps keys itself
+	entry := core.Entry{Time: start.UTC(), Service: svc.ID, Method: req.Method, Host: host, Path: swap.RedactPath(req.URL.Path)}
+	var meter *usage.Meter   // reads usage from the response, when the proxy swaps keys itself
+	var scrub *swap.Scrubber // puts the token back for the real key in responses, for keys in the URL
 	done := func(status int, note string) {
 		entry.Status, entry.Note, entry.DurationMs = status, note, time.Since(start).Milliseconds()
 		meter.Finish(&entry)
@@ -328,9 +329,18 @@ func (p *Proxy) forward(conn net.Conn, br *bufio.Reader, req *http.Request, host
 			return false
 		}
 	} else {
+		if stray := swap.URLStray(req.URL, svc); len(stray) > 0 {
+			msg := urlStrayMessage(stray, svc)
+			writeError(conn, http.StatusBadRequest, "keystub: "+msg)
+			done(http.StatusBadRequest, msg)
+			return false
+		}
 		token := proxyToken
 		if token == "" {
 			token = swap.Find(req.Header, svc.Header)
+		}
+		if token == "" {
+			token = swap.FindURL(req.URL, svc)
 		}
 		g, err := p.Core.Authorize(ctx, token, svc.ID)
 		if g.Token.ID != "" {
@@ -352,8 +362,12 @@ func (p *Proxy) forward(conn net.Conn, br *bufio.Reader, req *http.Request, host
 		if !strings.HasSuffix(target, ":443") {
 			req.Host = target
 		}
-		swap.Apply(req.Header, g.Key, svc.Header, svc.Format)
-		meter = usage.Start(svc.ID, req.Method, req.URL.Path, start)
+		meter = usage.Start(svc.ID, req.Method, req.URL.Path, start) // before the swap: a path may hold the key
+		swap.Request(req.Header, req.URL, g.Key, svc)
+		if swap.KeyInURL(svc) {
+			scrub = swap.NewScrubber(g.Key, token)
+			swap.Uncompressed(req.Header)
+		}
 		usage.Narrow(svc.ID, req.Header)
 	}
 	body := &trackedBody{ReadCloser: req.Body}
@@ -408,6 +422,9 @@ func (p *Proxy) forward(conn net.Conn, br *bufio.Reader, req *http.Request, host
 	}
 	defer resp.Body.Close()
 	meter.Response(resp) // scans the body as resp.Write streams it
+	if scrub != nil {
+		scrub.Response(resp)
+	}
 	note := ""
 	if p.Edge != nil {
 		// The edge answered itself: its outcome, not the status, says why.
@@ -444,7 +461,7 @@ func (p *Proxy) toEdge(req *http.Request, host, target string, svc core.Service,
 	// With no proxy token anywhere the edge can only refuse, and the
 	// request may carry the box's own credentials for the host: they stay
 	// on the box.
-	if proxyToken == "" && swap.Find(req.Header, svc.Header) == "" {
+	if proxyToken == "" && swap.Find(req.Header, svc.Header) == "" && swap.InURL(req.URL) == "" {
 		return http.StatusUnauthorized, "this request has no valid proxy token"
 	}
 	// The edge writes the real key. A credential the app set itself would
@@ -534,6 +551,19 @@ func bareScheme(s string) bool {
 // basicWords are fixed, non-secret passwords some services pair with an
 // API key as the Basic user.
 var basicWords = []string{"", "X", "x", "api_token", "x-oauth-basic"}
+
+// urlStrayMessage explains a refused request whose token sat in the URL
+// outside the service's key spots.
+func urlStrayMessage(places []string, svc core.Service) string {
+	where := "Authorization or the service's own auth header"
+	switch {
+	case svc.Query != "":
+		where = "Authorization, the service's own auth header or its " + svc.Query + " query parameter"
+	case len(svc.Paths) > 0:
+		where = "the service's key spot in the path (" + strings.Join(svc.Paths, ", ") + ")"
+	}
+	return "the proxy token is in the " + strings.Join(places, ", ") + "; send it only in " + where
+}
 
 // strayMessage explains a refused request whose token sat outside the auth
 // headers, where the service might keep the real key and send it back.

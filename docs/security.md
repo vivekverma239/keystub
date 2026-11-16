@@ -32,7 +32,8 @@ A stolen proxy token is worth only what its environment, services, limits and li
 ## Not covered
 
 - **A service that echoes its own auth header** (httpbin's `/headers`, a debugging endpoint) shows the key to whoever holds a token. Don't put such services behind Keystub.
-- **Keys in query strings or bodies** aren't swapped, and a token there goes upstream unchanged (the token can leak to the provider, never the key).
+- **Keys in request bodies** aren't swapped, and a token there goes upstream unchanged (the token can leak to the provider, never the key). Keys in the URL are swapped only for services that read them there, and the key is scrubbed from their responses ([keys in the URL](catalog.md#keys-in-the-url)); a token anywhere else in a URL is refused.
+- **Scrubbing finds the key as written or URL-escaped.** A service that echoes it in another form (base64, split across fields) would hand it back; none in the catalog is known to.
 - **The edge speaks plain HTTP.** Put TLS in front of it before exposing it beyond the machine.
 - **Programs on a linked box.** The machine credential is in the user's login Keychain or a 0600 file, so any program running as that user can read it and get a token in each environment the admin ticked. The ticked environments are the only limit; the approve screen says so.
 - **Machine tokens that expire stay** in the token list, as revoked ones do: there is no delete yet. Each `keystub run` after expiry makes a fresh one.
