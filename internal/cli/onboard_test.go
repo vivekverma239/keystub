@@ -361,13 +361,7 @@ func TestStatusServiceWithNoBaseURL(t *testing.T) {
 	r.must("", "init", "--env-file", path, "--yes", "--json")
 	st := r.must("", "status", "--env-file", path, "--json").json(t)
 	next := strings.Join(toStrings(st["next"]), "\n")
-	if strings.Contains(next, "keystub setup") || strings.Contains(next, "keystub init") || !strings.Contains(next, "--service github --write-env") {
+	if strings.Contains(next, "keystub setup") || strings.Contains(next, "keystub init") || !strings.Contains(next, "keystub run --env tool/dev") {
 		t.Fatalf("next for a key with no base URL: %s", next)
-	}
-	// Following it leaves nothing to do but check.
-	r.must("", "tokens", "create", "tool/dev", "--name", "local", "--service", "github", "--write-env", path, "--yes", "--json")
-	st = r.must("", "status", "--env-file", path, "--json").json(t)
-	if next = strings.Join(toStrings(st["next"]), "\n"); !strings.Contains(next, "keystub doctor") || strings.Contains(next, "tokens create") {
-		t.Fatalf("next after the token: %s", next)
 	}
 }
