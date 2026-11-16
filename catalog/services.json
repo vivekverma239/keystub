@@ -1635,6 +1635,651 @@
       "envVars": [
         "ALGOLIA_API_KEY"
       ]
+    },
+    {
+      "id": "azure-openai",
+      "name": "Azure OpenAI",
+      "category": "llm",
+      "docs": "https://learn.microsoft.com/en-us/azure/ai-foundry/openai/reference",
+      "note": "Resource hosts vary, hence the wildcards; no quick start. Microsoft Entra ID tokens are short-lived and not covered. Other Azure AI services on these hosts that take the key in Ocp-Apim-Subscription-Key aren't covered.",
+      "hosts": [
+        "*.openai.azure.com",
+        "*.cognitiveservices.azure.com",
+        "*.services.ai.azure.com"
+      ],
+      "auth": {
+        "header": "api-key",
+        "format": "{key}"
+      },
+      "envVars": [
+        "AZURE_OPENAI_API_KEY"
+      ],
+      "statusPage": "https://azure.status.microsoft"
+    },
+    {
+      "id": "cerebras",
+      "name": "Cerebras",
+      "category": "llm",
+      "docs": "https://inference-docs.cerebras.ai/api-reference/chat-completions",
+      "hosts": [
+        "api.cerebras.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "CEREBRAS_BASE_URL"
+      },
+      "envVars": [
+        "CEREBRAS_API_KEY"
+      ],
+      "statusPage": "https://status.cerebras.ai",
+      "usage": {
+        "operations": [
+          {
+            "name": "chat",
+            "method": "POST",
+            "path": "/v1/chat/completions"
+          },
+          {
+            "name": "completions",
+            "method": "POST",
+            "path": "/v1/completions"
+          }
+        ],
+        "model": "model|request:model",
+        "input": [
+          "usage.prompt_tokens"
+        ],
+        "cached": [
+          "usage.prompt_tokens_details.cached_tokens"
+        ],
+        "output": [
+          "usage.completion_tokens"
+        ]
+      }
+    },
+    {
+      "id": "deepgram",
+      "name": "Deepgram",
+      "category": "speech",
+      "docs": "https://developers.deepgram.com/reference/auth",
+      "note": "API keys go as Token, not Bearer. Browser WebSockets pass the key as a subprotocol, which isn't swapped; server-side SDKs send the header.",
+      "hosts": [
+        "api.deepgram.com",
+        "api.eu.deepgram.com",
+        "api.au.deepgram.com",
+        "api.in.deepgram.com",
+        "agent.deepgram.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Token {key}"
+      },
+      "envVars": [
+        "DEEPGRAM_API_KEY"
+      ],
+      "statusPage": "https://status.deepgram.com"
+    },
+    {
+      "id": "assemblyai",
+      "name": "AssemblyAI",
+      "category": "speech",
+      "docs": "https://www.assemblyai.com/docs/api-reference/overview",
+      "note": "The key is sent raw in Authorization, without Bearer. Temporary streaming tokens in the ?token= query aren't swapped.",
+      "hosts": [
+        "api.assemblyai.com",
+        "api.eu.assemblyai.com",
+        "streaming.assemblyai.com",
+        "streaming.us.assemblyai.com",
+        "streaming.eu.assemblyai.com",
+        "llm-gateway.assemblyai.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "{key}"
+      },
+      "envVars": [
+        "ASSEMBLYAI_API_KEY"
+      ],
+      "statusPage": "https://status.assemblyai.com"
+    },
+    {
+      "id": "cartesia",
+      "name": "Cartesia",
+      "category": "speech",
+      "docs": "https://docs.cartesia.ai/api-reference/tts/bytes",
+      "note": "Browser clients that pass the key in the query string aren't covered.",
+      "hosts": [
+        "api.cartesia.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "CARTESIA_BASE_URL"
+      },
+      "envVars": [
+        "CARTESIA_API_KEY"
+      ],
+      "statusPage": "https://status.cartesia.ai"
+    },
+    {
+      "id": "voyage",
+      "name": "Voyage AI",
+      "category": "llm",
+      "docs": "https://docs.voyageai.com/reference/embeddings-api",
+      "note": "Keys issued by MongoDB Atlas (al-\u2026) go to ai.mongodb.com.",
+      "hosts": [
+        "api.voyageai.com",
+        "ai.mongodb.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "VOYAGE_API_KEY"
+      ],
+      "statusPage": "https://status.voyageai.com"
+    },
+    {
+      "id": "jina",
+      "name": "Jina AI",
+      "category": "search",
+      "docs": "https://docs.jina.ai/",
+      "hosts": [
+        "api.jina.ai",
+        "r.jina.ai",
+        "s.jina.ai",
+        "eu.r.jina.ai",
+        "eu.s.jina.ai",
+        "deepsearch.jina.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "JINA_API_KEY"
+      ]
+    },
+    {
+      "id": "tavily",
+      "name": "Tavily",
+      "category": "search",
+      "docs": "https://docs.tavily.com/documentation/api-reference/introduction",
+      "note": "Old SDKs that put api_key in the request body, and the hosted MCP server's key in the URL, aren't swapped.",
+      "hosts": [
+        "api.tavily.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "TAVILY_API_KEY"
+      ]
+    },
+    {
+      "id": "serper",
+      "name": "Serper",
+      "category": "search",
+      "docs": "https://serper.dev",
+      "hosts": [
+        "google.serper.dev",
+        "scrape.serper.dev"
+      ],
+      "auth": {
+        "header": "X-API-KEY",
+        "format": "{key}"
+      },
+      "envVars": [
+        "SERPER_API_KEY"
+      ]
+    },
+    {
+      "id": "brave-search",
+      "name": "Brave Search",
+      "category": "search",
+      "docs": "https://api-dashboard.search.brave.com/app/documentation/web-search/get-started",
+      "hosts": [
+        "api.search.brave.com"
+      ],
+      "auth": {
+        "header": "X-Subscription-Token",
+        "format": "{key}"
+      },
+      "envVars": [
+        "BRAVE_API_KEY"
+      ]
+    },
+    {
+      "id": "langsmith",
+      "name": "LangSmith",
+      "category": "observability",
+      "docs": "https://docs.langchain.com/langsmith",
+      "note": "Regional hosts (eu.api.smith.langchain.com and others) are covered by the wildcard; self-hosted instances aren't. No quick start, since the regions don't share a host.",
+      "hosts": [
+        "api.smith.langchain.com",
+        "*.api.smith.langchain.com"
+      ],
+      "auth": {
+        "header": "x-api-key",
+        "format": "{key}"
+      },
+      "envVars": [
+        "LANGSMITH_API_KEY",
+        "LANGCHAIN_API_KEY"
+      ],
+      "statusPage": "https://status.smith.langchain.com"
+    },
+    {
+      "id": "langfuse",
+      "name": "Langfuse",
+      "category": "observability",
+      "docs": "https://langfuse.com/docs/api-and-data-platform/features/public-api",
+      "note": "Basic auth: the public key (LANGFUSE_PUBLIC_KEY, pk-lf-\u2026) stays real as the user name; the proxy token is the password. Regions us., jp. and hipaa. are covered by the wildcard; no quick start, since the regions don't share a host.",
+      "hosts": [
+        "cloud.langfuse.com",
+        "*.cloud.langfuse.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "LANGFUSE_SECRET_KEY"
+      ],
+      "statusPage": "https://status.langfuse.com"
+    },
+    {
+      "id": "helicone",
+      "name": "Helicone",
+      "category": "observability",
+      "docs": "https://docs.helicone.ai/gateway/overview",
+      "note": "Covers the AI Gateway and the Helicone API. The older per-provider proxies (oai.helicone.ai and others) need a second key in Helicone-Auth and aren't covered.",
+      "hosts": [
+        "ai-gateway.helicone.ai",
+        "api.helicone.ai"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "HELICONE_API_KEY"
+      ]
+    },
+    {
+      "id": "turso",
+      "name": "Turso Platform API",
+      "category": "database",
+      "docs": "https://docs.turso.tech/api-reference/introduction",
+      "note": "Account-level platform token. Database tokens are the Turso database entry.",
+      "hosts": [
+        "api.turso.tech"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "TURSO_API_TOKEN"
+      ],
+      "statusPage": "https://status.turso.tech"
+    },
+    {
+      "id": "turso-database",
+      "name": "Turso database",
+      "category": "database",
+      "docs": "https://docs.turso.tech/sdk/http/reference",
+      "note": "A database token over HTTP (https:// URLs). libsql:// and WebSocket connections send the token inside the protocol, which isn't swapped.",
+      "hosts": [
+        "*.turso.io"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "TURSO_AUTH_TOKEN"
+      ],
+      "statusPage": "https://status.turso.tech"
+    },
+    {
+      "id": "qdrant",
+      "name": "Qdrant Cloud",
+      "category": "database",
+      "docs": "https://qdrant.tech/documentation/cloud/authentication/",
+      "note": "A cluster's database key over REST (port 6333). gRPC (port 6334) and the Cloud Management API (apikey scheme) aren't covered.",
+      "hosts": [
+        "*.aws.cloud.qdrant.io",
+        "*.gcp.cloud.qdrant.io",
+        "*.azure.cloud.qdrant.io"
+      ],
+      "auth": {
+        "header": "api-key",
+        "format": "{key}"
+      },
+      "envVars": [
+        "QDRANT_API_KEY"
+      ],
+      "statusPage": "https://status.qdrant.io"
+    },
+    {
+      "id": "weaviate",
+      "name": "Weaviate Cloud",
+      "category": "database",
+      "docs": "https://docs.weaviate.io/cloud/manage-clusters/connect",
+      "note": "REST only; the clients' gRPC connection isn't covered. Model provider keys in X-\u2026-Api-Key headers must stay real.",
+      "hosts": [
+        "*.weaviate.cloud",
+        "*.weaviate.network"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "WEAVIATE_API_KEY"
+      ]
+    },
+    {
+      "id": "razorpay",
+      "name": "Razorpay",
+      "category": "payments",
+      "docs": "https://razorpay.com/docs/api/authentication/",
+      "note": "Basic auth: the key ID (rzp_live_\u2026 or rzp_test_\u2026) stays real as the user name; the proxy token is the password. Checking payment signatures uses the key secret locally, so that needs the real secret.",
+      "hosts": [
+        "api.razorpay.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "RAZORPAY_KEY_SECRET"
+      ],
+      "statusPage": "https://status.razorpay.com"
+    },
+    {
+      "id": "paddle",
+      "name": "Paddle",
+      "category": "payments",
+      "docs": "https://developer.paddle.com/api-reference/about/authentication",
+      "note": "Webhook signatures use a separate secret.",
+      "hosts": [
+        "api.paddle.com",
+        "sandbox-api.paddle.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "PADDLE_API_KEY"
+      ],
+      "statusPage": "https://status.paddle.com"
+    },
+    {
+      "id": "lemonsqueezy",
+      "name": "Lemon Squeezy",
+      "category": "payments",
+      "docs": "https://docs.lemonsqueezy.com/api/getting-started/requests",
+      "hosts": [
+        "api.lemonsqueezy.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "LEMONSQUEEZY_API_KEY"
+      ],
+      "statusPage": "https://status.lemonsqueezy.com"
+    },
+    {
+      "id": "workos",
+      "name": "WorkOS",
+      "category": "auth",
+      "docs": "https://workos.com/docs/reference",
+      "note": "The SDK also sends the key as client_secret in the body of AuthKit code exchanges, which isn't swapped.",
+      "hosts": [
+        "api.workos.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "WORKOS_API_KEY"
+      ],
+      "statusPage": "https://status.workos.com"
+    },
+    {
+      "id": "mailgun",
+      "name": "Mailgun",
+      "category": "email",
+      "docs": "https://documentation.mailgun.com/docs/mailgun/api-reference/authentication",
+      "note": "Basic auth: the fixed name api stays real as the user name; the proxy token is the password. Webhook signing keys and SMTP passwords are separate.",
+      "hosts": [
+        "api.mailgun.net",
+        "api.eu.mailgun.net",
+        "api.au.mailgun.net",
+        "*.api.mailgun.net"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "MAILGUN_API_KEY"
+      ],
+      "statusPage": "https://status.mailgun.com"
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "category": "messaging",
+      "docs": "https://docs.discord.com/developers/reference",
+      "note": "Bot tokens over the REST API. Bots on the gateway WebSocket send the token inside a message, which isn't swapped.",
+      "hosts": [
+        "discord.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bot {key}"
+      },
+      "envVars": [
+        "DISCORD_TOKEN",
+        "DISCORD_BOT_TOKEN"
+      ],
+      "statusPage": "https://discordstatus.com"
+    },
+    {
+      "id": "posthog",
+      "name": "PostHog",
+      "category": "analytics",
+      "docs": "https://posthog.com/docs/api",
+      "note": "The personal API key (phx_\u2026) for the private API. The project key (phc_\u2026) is public and stays real; ingestion hosts (us.i.posthog.com and others) aren't claimed, so capture calls and local flag evaluation there go out unchanged.",
+      "hosts": [
+        "us.posthog.com",
+        "eu.posthog.com",
+        "app.posthog.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "POSTHOG_PERSONAL_API_KEY",
+        "POSTHOG_CLI_API_KEY"
+      ],
+      "statusPage": "https://status.posthog.com"
+    },
+    {
+      "id": "datadog",
+      "name": "Datadog",
+      "category": "observability",
+      "docs": "https://docs.datadoghq.com/api/latest/authentication/",
+      "note": "Covers the API key, which is all that sending metrics, events, service checks and logs needs. Calls that also need the application key (DD-APPLICATION-KEY) send it real; a stand-in there is refused.",
+      "hosts": [
+        "*.datadoghq.com",
+        "*.datadoghq.eu",
+        "*.ddog-gov.com"
+      ],
+      "auth": {
+        "header": "DD-API-KEY",
+        "format": "{key}"
+      },
+      "envVars": [
+        "DD_API_KEY",
+        "DATADOG_API_KEY"
+      ],
+      "statusPage": "https://status.datadoghq.com"
+    },
+    {
+      "id": "mixpanel",
+      "name": "Mixpanel",
+      "category": "analytics",
+      "docs": "https://docs.mixpanel.com/reference/service-accounts",
+      "note": "Basic auth: the service account's user name stays real as the user name; the proxy token is the password. The project token for tracking is public and stays real.",
+      "hosts": [
+        "mixpanel.com",
+        "eu.mixpanel.com",
+        "in.mixpanel.com",
+        "api.mixpanel.com",
+        "api-eu.mixpanel.com",
+        "api-in.mixpanel.com",
+        "data.mixpanel.com",
+        "data-eu.mixpanel.com",
+        "data-in.mixpanel.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [],
+      "statusPage": "https://status.mixpanel.com"
+    },
+    {
+      "id": "segment",
+      "name": "Segment Public API",
+      "category": "analytics",
+      "docs": "https://docs.segmentapis.com",
+      "note": "A workspace token for managing sources and destinations. Tracking write keys aren't covered: the SDKs also put them in the request body.",
+      "hosts": [
+        "api.segmentapis.com",
+        "eu1.api.segmentapis.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [],
+      "statusPage": "https://status.segment.com"
+    },
+    {
+      "id": "hubspot",
+      "name": "HubSpot",
+      "category": "crm",
+      "docs": "https://developers.hubspot.com/docs/api/private-apps",
+      "note": "Private app access tokens (pat-\u2026). Developer API keys go in the query string and aren't covered.",
+      "hosts": [
+        "api.hubapi.com",
+        "api.hubspot.com",
+        "api-eu1.hubapi.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "HUBSPOT_ACCESS_TOKEN"
+      ],
+      "statusPage": "https://status.hubspot.com"
+    },
+    {
+      "id": "airtable",
+      "name": "Airtable",
+      "category": "productivity",
+      "docs": "https://airtable.com/developers/web/api/authentication",
+      "hosts": [
+        "api.airtable.com",
+        "content.airtable.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "baseUrl": {
+        "var": "AIRTABLE_ENDPOINT_URL"
+      },
+      "envVars": [
+        "AIRTABLE_API_KEY"
+      ],
+      "statusPage": "https://status.airtable.com"
+    },
+    {
+      "id": "atlassian",
+      "name": "Atlassian (Jira, Confluence)",
+      "category": "productivity",
+      "docs": "https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis/",
+      "note": "Basic auth: the account email stays real as the user name; the proxy token is the password. Scoped API tokens go through api.atlassian.com/ex/jira/{cloudId}.",
+      "hosts": [
+        "*.atlassian.net",
+        "api.atlassian.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "JIRA_API_TOKEN",
+        "ATLASSIAN_API_TOKEN"
+      ],
+      "statusPage": "https://status.atlassian.com"
+    },
+    {
+      "id": "shopify",
+      "name": "Shopify",
+      "category": "commerce",
+      "docs": "https://shopify.dev/docs/api/usage/authentication",
+      "note": "Admin API access tokens (shpat_\u2026). Storefront tokens use other headers, and the app's client secret (token exchange, webhook HMAC) isn't covered.",
+      "hosts": [
+        "*.myshopify.com"
+      ],
+      "auth": {
+        "header": "X-Shopify-Access-Token",
+        "format": "{key}"
+      },
+      "envVars": [
+        "SHOPIFY_ACCESS_TOKEN"
+      ],
+      "statusPage": "https://www.shopifystatus.com"
+    },
+    {
+      "id": "cloudinary",
+      "name": "Cloudinary",
+      "category": "media",
+      "docs": "https://cloudinary.com/documentation/admin_api#authentication",
+      "note": "Basic auth: the API key stays real as the user name; the proxy token is the password. The SDKs sign uploads locally with the secret, so SDK uploads need the real secret; Admin API calls and unsigned Basic-auth uploads work. CLOUDINARY_URL holds both halves and isn't set.",
+      "hosts": [
+        "api.cloudinary.com",
+        "api-eu.cloudinary.com",
+        "api-ap.cloudinary.com"
+      ],
+      "auth": {
+        "header": "Authorization",
+        "format": "Bearer {key}"
+      },
+      "envVars": [
+        "CLOUDINARY_API_SECRET"
+      ],
+      "statusPage": "https://status.cloudinary.com"
     }
   ]
 }

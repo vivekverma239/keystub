@@ -209,6 +209,77 @@
       "upstream": {
         "Authorization": "lin_api_real"
       }
+    },
+    {
+      "name": "a scheme other than Bearer keeps its word (Deepgram Token)",
+      "service": "deepgram",
+      "request": {
+        "Authorization": "Token sk-stub-0a1b2c3d"
+      },
+      "realKey": "dg-real",
+      "token": "sk-stub-0a1b2c3d",
+      "upstream": {
+        "Authorization": "Token dg-real"
+      }
+    },
+    {
+      "name": "no token anywhere: the catalog's scheme is written (Discord Bot)",
+      "service": "discord",
+      "request": {},
+      "realKey": "discord-real",
+      "token": "",
+      "upstream": {
+        "Authorization": "Bot discord-real"
+      }
+    },
+    {
+      "name": "Basic auth with the fixed user name api (Mailgun)",
+      "service": "mailgun",
+      "request": {
+        "Authorization": "Basic YXBpOnNrLXN0dWItMGExYjJjM2Q="
+      },
+      "realKey": "mg-real",
+      "token": "sk-stub-0a1b2c3d",
+      "upstream": {
+        "Authorization": "Basic YXBpOm1nLXJlYWw="
+      }
+    },
+    {
+      "name": "the service's own header, lower case (Azure OpenAI api-key)",
+      "service": "azure-openai",
+      "request": {
+        "Api-Key": "sk-stub-0a1b2c3d"
+      },
+      "realKey": "azure-real",
+      "token": "sk-stub-0a1b2c3d",
+      "upstream": {
+        "Api-Key": "azure-real",
+        "Authorization": ""
+      }
+    },
+    {
+      "name": "a real second secret in another header passes (Datadog application key)",
+      "service": "datadog",
+      "request": {
+        "Dd-Api-Key": "sk-stub-0a1b2c3d",
+        "Dd-Application-Key": "dd-app-real"
+      },
+      "realKey": "dd-api-real",
+      "token": "sk-stub-0a1b2c3d",
+      "upstream": {
+        "Dd-Api-Key": "dd-api-real",
+        "Dd-Application-Key": "dd-app-real"
+      }
+    },
+    {
+      "name": "a token in the second secret's header is refused (Datadog application key)",
+      "service": "datadog",
+      "request": {
+        "Dd-Api-Key": "sk-stub-0a1b2c3d",
+        "Dd-Application-Key": "sk-stub-0a1b2c3d"
+      },
+      "realKey": "dd-api-real",
+      "refused": true
     }
   ],
   "authHeaders": [

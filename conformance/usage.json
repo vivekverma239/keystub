@@ -1389,6 +1389,35 @@
         },
         "costMicros": 3000
       }
+    },
+    {
+      "name": "cerebras chat completion, no list price",
+      "service": "cerebras",
+      "request": {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion\",\"model\":\"gpt-oss-120b\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"hi\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":120,\"completion_tokens\":30,\"total_tokens\":150,\"prompt_tokens_details\":{\"cached_tokens\":64},\"completion_tokens_details\":{\"reasoning_tokens\":10}},\"time_info\":{\"queue_time\":0.0001}}"
+      },
+      "expect": {
+        "operation": "chat",
+        "model": "gpt-oss-120b",
+        "outcome": "ok",
+        "usage": {
+          "inputTokens": 120,
+          "cachedTokens": 64,
+          "cacheWriteTokens": 0,
+          "outputTokens": 30,
+          "units": 0
+        },
+        "costMicros": null,
+        "quota": null
+      }
     }
   ]
 }

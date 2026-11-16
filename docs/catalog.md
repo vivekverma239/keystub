@@ -44,15 +44,21 @@ Services whose auth doesn't fit one key in one header:
 
 | Service | Why |
 | --- | --- |
-| Datadog | Most calls need two secrets, an API key and an application key, in two headers |
-| Langfuse, Modal | Two secrets per request (Langfuse as Basic auth, public and secret key) |
-| NCBI E-utilities, Trello, LocationIQ | The key goes in the query string |
+| Modal | Two secrets per request |
+| Helicone per-provider proxies (oai.helicone.ai and others) | The provider's key in Authorization and Helicone's in Helicone-Auth; the catalog's Helicone entry covers the AI Gateway |
+| NCBI E-utilities, Trello, LocationIQ, Mapbox | The key goes in the query string |
+| Telegram Bot API | The bot token is part of the URL path |
+| MongoDB Atlas | Clusters speak the MongoDB wire protocol, not HTTP; the Admin API takes hour-long tokens or Digest auth |
+| Auth0 Management API | Its tokens last a day and are minted with the client secret in a request body |
+| Segment tracking API | The SDKs repeat the write key in the request body |
 | MailerLite classic API | Its own header on another host; the catalog's MailerLite entry covers the new API |
-| Railway project tokens, Postmark account tokens, GitLab CI job tokens | A second token type in its own header; the catalog entry covers the main token type |
+| Railway project tokens, Postmark account tokens, GitLab CI job tokens, Qdrant Cloud management keys | A second token type in its own header or scheme; the catalog entry covers the main token type |
+
+Some catalog services keep a second credential real, and their notes say so: Datadog's application key, and the user name of Basic-auth services (Twilio, Langfuse, Mailgun, Razorpay, Mixpanel, Atlassian, Cloudinary).
 
 ## Usage metadata
 
-`usage` tells every data plane how to meter a service's responses ([usage](usage.md)). The LLM services have it: OpenAI, Anthropic, Gemini, Groq, Mistral, OpenRouter, Vercel AI Gateway, DeepSeek, Z.AI, xAI, Together, Fireworks, Cohere and Perplexity.
+`usage` tells every data plane how to meter a service's responses ([usage](usage.md)). The LLM services have it: OpenAI, Anthropic, Gemini, Groq, Mistral, OpenRouter, Vercel AI Gateway, DeepSeek, Z.AI, xAI, Together, Fireworks, Cohere, Perplexity and Cerebras.
 
 | Field | What it does |
 | --- | --- |
