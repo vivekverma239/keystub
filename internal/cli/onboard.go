@@ -357,7 +357,13 @@ func (c *ctx) initEnv(args []string) error {
 
 	if plan.DryRun || !plan.Changes {
 		plan.NextSteps = c.initNext(plan)
-		return c.emit(plan, func(w io.Writer) { c.printPlan(w, plan) })
+		if err := c.emit(plan, func(w io.Writer) { c.printPlan(w, plan) }); err != nil {
+			return err
+		}
+		if !plan.DryRun {
+			c.offerConnect(plan.Env, filepath.Dir(plan.File))
+		}
+		return nil
 	}
 	if !c.json {
 		c.printPlan(c.Stderr, plan)
@@ -419,6 +425,7 @@ func (c *ctx) initEnv(args []string) error {
 		return err
 	}
 	plan.NextSteps = c.initNext(plan)
+	defer c.offerConnect(plan.Env, filepath.Dir(plan.File))
 	return c.emit(plan, func(w io.Writer) {
 		fmt.Fprintf(w, "Done: %s is set up.\n", plan.Env)
 		if plan.FileSet != nil {

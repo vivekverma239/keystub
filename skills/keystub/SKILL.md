@@ -162,6 +162,13 @@ in this folder and uses the environment `<folder>/dev`; name others with
    reuses the token and refreshes short-lived credentials.
 4. Check it: `keystub doctor --json`. Each check is `ok`, `warn` or
    `fail`, with what to do in `detail`; exit code 1 means one failed.
+5. Deploys: `init` says when the code deploys to Fly.io,
+   Cloudflare or Convex (`fly.toml`, a wrangler config, `convex/`). Only when
+   the user wants sessions to deploy, have them run `keystub connect` in
+   their terminal (it asks per target; Cloudflare needs a token pasted). Fly
+   and Convex come from their CLI logins; `--only fly,convex` with `--yes`
+   connects those two without a terminal. Never pass `--yes` unasked: it
+   makes deploy tokens.
 
 The steps below do the same one at a time, for anything `init` leaves
 alone (a key inside a template, a service the catalog doesn't have).

@@ -37,7 +37,7 @@ const (
 )
 
 // Commands are the top-level commands this package runs.
-var Commands = []string{"login", "logout", "whoami", "init", "doctor", "status", "keys", "projects", "envs", "tokens", "services", "usage", "setup", "ca"}
+var Commands = []string{"login", "logout", "whoami", "init", "doctor", "status", "keys", "projects", "envs", "tokens", "services", "usage", "setup", "connect", "ca"}
 
 // Env is everything a command touches outside itself, so tests can run
 // it in-process.
@@ -144,6 +144,8 @@ func (c *ctx) dispatch(cmd string, args []string) error {
 		return c.usage(args)
 	case "setup":
 		return c.setup(args)
+	case "connect":
+		return c.connect(args)
 	case "ca":
 		return c.ca(args)
 	}
