@@ -131,7 +131,7 @@ func (c *ctx) status(args []string) error {
 		if me.Account != nil {
 			out["account"] = me.Account["name"]
 		}
-		next = c.statusEnv(out, path, env, names, values, &sf, suggest, p.args, p.flags["env-file"])
+		next = c.statusEnv(out, path, env, names, values, &sf, suggest, p.flags["env-file"])
 	}
 	sort.Strings(sf.RealKeys)
 	sort.Strings(sf.Tokens)
@@ -167,7 +167,9 @@ func (c *ctx) status(args []string) error {
 			fmt.Fprintf(w, "Signed in    %v (%v)\n", out["user"], out["account"])
 		}
 		fmt.Fprintf(w, "Environment  %s", env)
-		if ok, _ := out["envExists"].(bool); signedIn && !ok {
+		if _, failed := out["envError"]; failed {
+			fmt.Fprint(w, " (couldn't read it)")
+		} else if ok, _ := out["envExists"].(bool); signedIn && !ok {
 			fmt.Fprint(w, " (not made yet)")
 		}
 		fmt.Fprintln(w)
@@ -197,7 +199,7 @@ func (c *ctx) status(args []string) error {
 
 // statusEnv fills in the environment, its services and tokens, and the
 // file's real keys, and says what to do next.
-func (c *ctx) statusEnv(out map[string]any, path, env string, names []string, values map[string]string, sf *statusFile, suggest func(string, ...string) string, envArgs []string, envFile string) []string {
+func (c *ctx) statusEnv(out map[string]any, path, env string, names []string, values map[string]string, sf *statusFile, suggest func(string, ...string) string, envFile string) []string {
 	var next []string
 	var ls struct {
 		Links []link `json:"links"`
@@ -229,7 +231,9 @@ func (c *ctx) statusEnv(out map[string]any, path, env string, names []string, va
 	}
 	svcs := []statusService{}
 	standIns := 0
+	linked := map[string]bool{}
 	for _, l := range ls.Links {
+		linked[l.Service] = true
 		k := kinds[l.Service]
 		if k == "" {
 			k = "stand-in"
@@ -258,13 +262,32 @@ func (c *ctx) statusEnv(out map[string]any, path, env string, names []string, va
 	}
 	out["tokens"] = toks
 
-	// Which variables still hold a real key.
+	// Which variables still hold a real key. A delivered secret or minted
+	// credential of a linked service is meant to be on the box as it is.
+	// setupHelps: a real key setup would swap for a token (a linked
+	// stand-in); the others are keys neither init nor setup takes.
+	setupHelps := false
+	var untaken []string
 	if sf.Exists {
 		if reads, err := c.readers(); err == nil {
 			sf.RealKeys = []string{}
 			for _, n := range names {
-				if _, ok := reads[n]; ok && values[n] != "" && !holdsToken(values[n]) {
-					sf.RealKeys = append(sf.RealKeys, n)
+				r, ok := reads[n]
+				if !ok || values[n] == "" || holdsToken(values[n]) {
+					continue
+				}
+				id := r.service.ID
+				if r.mintedAlt != nil && linked[r.mintedAlt.service.ID] {
+					continue // init linked the short-lived key for it
+				}
+				if (r.secret || r.minted) && linked[id] {
+					continue
+				}
+				sf.RealKeys = append(sf.RealKeys, n)
+				if linked[id] && !r.secret && !r.minted && !r.templated {
+					setupHelps = true
+				} else {
+					untaken = append(untaken, n)
 				}
 			}
 		}
@@ -278,7 +301,7 @@ func (c *ctx) statusEnv(out map[string]any, path, env string, names []string, va
 		var buf bytes.Buffer
 		sub := *c
 		sub.json, sub.Stdout, sub.Stderr = true, &buf, io.Discard
-		args := append(append([]string{}, envArgs...), "--dry-run")
+		args := []string{env, "--dry-run"}
 		if envFile != "" {
 			args = append(args, "--env-file", envFile)
 		}
@@ -295,10 +318,13 @@ func (c *ctx) statusEnv(out map[string]any, path, env string, names []string, va
 		next = append(next, suggest("init", "--dry-run", "--json")+" (the plan; it changes nothing), show the user, and on their yes run it with --yes")
 	case len(svcs) == 0:
 		next = append(next, "link a saved key: keystub keys list --json, then keystub envs link "+env+" SERVICE KEY --no-token --json")
-	case len(sf.RealKeys) > 0, !sf.Exists && standIns > 0:
+	case setupHelps, !sf.Exists && standIns > 0:
 		next = append(next, suggest("setup", "--dry-run", "--json")+", then ask the user before writing tokens in place of the real keys")
 	case len(sf.Tokens) > 0:
 		next = append(next, suggest("doctor", "--json")+" (checks each token works)")
+	}
+	if !initChanges && len(untaken) > 0 {
+		next = append(next, fmt.Sprintf("%s still hold real keys that init and setup leave alone (%s shows why under skipped): tell the user", strings.Join(untaken, ", "), suggest("init", "--dry-run", "--json")))
 	}
 	for _, t := range toks {
 		if t.ExpiresAt == nil && t.Delivery {

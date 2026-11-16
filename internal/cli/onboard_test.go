@@ -348,7 +348,8 @@ func TestStatusNamesANonDefaultEnvironment(t *testing.T) {
 	if st["env"] != "shop/staging" {
 		t.Fatalf("env %v", st["env"])
 	}
-	if next := strings.Join(toStrings(st["next"]), "\n"); !strings.Contains(next, "shop/staging") {
-		t.Errorf("next doesn't name the environment: %s", next)
+	next := strings.Join(toStrings(st["next"]), "\n")
+	if !strings.Contains(next, "shop/staging") || strings.Contains(next, "keystub init") {
+		t.Errorf("next after init of shop/staging: %s", next)
 	}
 }

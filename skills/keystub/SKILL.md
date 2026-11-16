@@ -44,7 +44,8 @@ One call answers: who is signed in (`signedIn`), this folder's environment
 (`env`, `envExists`), its `services` with their `kind` and saved key, its
 live `tokens` and what each `covers` (null: every service), which variables
 in the env file still hold a real key (`file.realKeys`, names only; null
-until signed in), the
+when it can't tell, such as signed out or no env file; a linked secret or
+short-lived credential isn't listed, it belongs there), the
 installed skill copies (`skill`), and `next`: the command to run next. It
 changes nothing and never prints a value. When it can't sign in,
 `signedIn` is false and `signInError` says why. `--env-file FILE` and
