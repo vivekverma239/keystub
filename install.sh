@@ -6,7 +6,9 @@
 # It downloads the binary for this machine, checks it against the
 # release's checksums, puts it in ~/.local/bin (or $KEYSTUB_INSTALL_DIR),
 # and adds that folder to PATH in your shell's rc file if it isn't there.
-# Set KEYSTUB_VERSION=v0.1.0 for a given release. macOS and Linux; on
+# It then offers to install the Keystub skill for coding agents, or
+# refreshes a copy installed before (KEYSTUB_SKILL=yes or no answers
+# without asking). Set KEYSTUB_VERSION=v0.1.0 for a given release. macOS and Linux; on
 # Windows, download the zip from the releases page.
 set -eu
 
@@ -77,5 +79,35 @@ case ":$PATH:" in
     fi
     ;;
 esac
+
+# The Agent Skill teaches coding agents (Claude Code, Codex, Cursor) to use
+# Keystub safely. A copy installed earlier is refreshed to match this
+# release; otherwise ask, or follow KEYSTUB_SKILL=yes|no when set.
+refreshed=""
+for parent in "$HOME/.claude/skills" "$HOME/.agents/skills" "$HOME/.cursor/skills"; do
+  if grep -qs '^name: keystub$' "$parent/keystub/SKILL.md"; then
+    "$DIR/keystub" skill install --dir "$parent" >/dev/null && say "Updated the Keystub skill in $parent/keystub"
+    refreshed=1
+  fi
+done
+if [ -z "$refreshed" ]; then
+  answer=${KEYSTUB_SKILL:-}
+  if [ -z "$answer" ] && [ -r /dev/tty ] && [ -w /dev/tty ] && (: </dev/tty) 2>/dev/null; then
+    printf 'Install the Keystub skill for coding agents (Claude Code, Codex, Cursor)? [Y/n] ' >/dev/tty
+    read -r answer </dev/tty || answer=n
+    answer=${answer:-y}
+  fi
+  case "$answer" in
+    [Yy]*)
+      "$DIR/keystub" skill install >&2 || say "Couldn't install the skill; later: keystub skill install"
+      ;;
+    "")
+      say "To teach coding agents to use Keystub: keystub skill install"
+      ;;
+    *)
+      say "Skipped the skill; later: keystub skill install"
+      ;;
+  esac
+fi
 
 say "Next: keystub login"

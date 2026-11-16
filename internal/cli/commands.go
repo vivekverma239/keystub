@@ -59,6 +59,7 @@ type token struct {
 	Kind      string     `json:"kind"`
 	Service   *string    `json:"service"`
 	Services  []string   `json:"services"` // a service token's services, from a server that has them
+	Delivery  bool       `json:"delivery,omitempty"`
 	Limits    *limits    `json:"limits"`
 	ExpiresAt *time.Time `json:"expiresAt"`
 	RevokedAt *time.Time `json:"revokedAt"`

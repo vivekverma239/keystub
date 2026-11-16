@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -96,5 +97,32 @@ func readJSON(t *testing.T, path string, v any) {
 	}
 	if err := json.Unmarshal(b, v); err != nil {
 		t.Fatalf("%s: %v", path, err)
+	}
+}
+
+func TestInstalledSaysWhetherACopyIsCurrent(t *testing.T) {
+	home := t.TempDir()
+	if got := Installed(home, ""); len(got) != 0 {
+		t.Fatalf("nothing installed: %v", got)
+	}
+	dir := filepath.Join(home, ".claude", "skills", Name)
+	if err := os.CopyFS(dir, Keystub); err != nil {
+		t.Fatal(err)
+	}
+	if got := Installed(home, ""); len(got) != 1 || !got[0].Current {
+		t.Fatalf("a fresh copy: %v", got)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: keystub\ndescription: old\n---\nold\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := Installed(home, ""); len(got) != 1 || got[0].Current {
+		t.Fatalf("an old copy: %v", got)
+	}
+	// A keystub folder that isn't this skill is left out.
+	other := filepath.Join(home, ".agents", "skills", Name)
+	_ = os.MkdirAll(other, 0o755)
+	_ = os.WriteFile(filepath.Join(other, "SKILL.md"), []byte("---\nname: other\n---\n"), 0o644)
+	if got := Installed(home, ""); len(got) != 1 {
+		t.Fatalf("someone else's folder: %v", got)
 	}
 }

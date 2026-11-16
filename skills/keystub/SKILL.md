@@ -12,7 +12,13 @@ on the way out, only for that service's hosts.
 - A **saved key** is a service's real key, saved once under a name (`team`).
 - An **environment** (`project/env`, e.g. `my-app/dev`) links one saved key per service.
 - A **token** belongs to one environment: an environment token covers every
-  service it links, a service token (`--service S`) one.
+  service it links; a service token covers the services named with
+  `--service` (one, or several: repeat it or give a comma list).
+- A linked service reaches a program one of three ways (`kind` in
+  `keystub status --json`): a **stand-in** (a token where the key was; the real
+  key never leaves Keystub), **minted** (a short-lived credential, such as
+  Google Cloud or AWS) or a **secret** (the value as it is, such as a database
+  URL).
 
 Do every step with the `keystub` CLI. Don't call Keystub's HTTP API
 yourself, and don't edit `.env` files by hand to move keys or tokens: the
@@ -30,6 +36,18 @@ It installs to `~/.local/bin`; if that isn't on the PATH yet, call
 `~/.local/bin/keystub` until the user opens a new terminal.
 Where Node is set up, `npm install -g keystub` installs the same binary
 from npm instead.
+
+## Start here
+
+Run `keystub status --json` first, every time, and again after a change.
+One call answers: who is signed in (`signedIn`), this folder's environment
+(`env`, `envExists`), its `services` with their `kind` and saved key, its
+live `tokens` and what each `covers` (null: every service), which variables
+in the env file still hold a real key (`file.realKeys`, names only; null
+until signed in), the
+installed skill copies (`skill`), and `next`: the command to run next. It
+changes nothing and never prints a value. `--env-file FILE` and
+`PROJECT/ENV` pick others.
 
 ## Rules
 
@@ -54,10 +72,42 @@ Follow these every time.
    prompts when stdin isn't a terminal, so without it they fail with exit
    code 2. `envs unlink` takes effect at once, with no `--yes`.
 5. Never ask the user to paste a key or an API key into the chat.
+6. **Send a token only where the service reads its key**: `Authorization`,
+   the service's own auth header, or, for a service that takes its key in the
+   URL (Google Maps, Telegram, Mapbox and others), that query parameter or
+   path. Keystub refuses a token anywhere else, such as a second header or
+   another part of the URL, so a stray copy can't leak.
 
 Exit codes: 0 ok, 1 error, 2 usage (a bad command, or a delete without
 `--yes`), 3 not signed in, 4 not found, 5 conflict (a name that is taken,
 a key that is still linked).
+
+## Decide
+
+Choose the narrowest thing that does the job, and tell the user what you
+chose and why.
+
+- **Which token.** Give each place its own token, named for it (`ci`,
+  `sandbox-3`, `local-dev`): one revoke then stops one place.
+  - A laptop or worktree: `keystub setup` makes and keeps one for the folder.
+  - A CI job or a sandbox that calls a few services: a token for just those,
+    with an expiry: `--service openai --service anthropic --ttl 1d`.
+  - A job that also needs minted credentials (Google Cloud, AWS) or secrets
+    (a database URL): those come only with a token for every service and a
+    delivery key (`--delivery`), so use that, with an expiry.
+  - Never a token without `--ttl` for a box you don't control.
+- **Which key.** Reuse a saved key before adding one: `keystub keys list --json`.
+  A teammate's shared key is fine for dev; ask before linking a key named
+  for a person or for prod into another environment.
+- **Which environment.** One per place the code runs (`my-app/dev`,
+  `my-app/ci`, `my-app/prod`). Don't point dev at prod's keys to save a step.
+- **Limits.** For an agent, CI or anything that loops, suggest a token limit
+  (`--daily`, `--per-minute`) and let the user pick the number.
+- **A service the catalog doesn't have.** Check `keystub services list --json`
+  first; add your own only with the hosts and variables from the service's
+  docs (`services add NAME --hosts … --env-vars …`), and tell the user.
+- **When unsure, ask.** Anything that deletes, revokes, unlinks, rewrites a
+  `.env` file, or widens a token is the user's call.
 
 ## Sign in
 
@@ -91,6 +141,11 @@ in this folder and uses the environment `<folder>/dev`; name others with
    service, a teammate's say, init links it rather than saving the one in
    the file (`shared: true`); say so, since the file's key is then not used.
    `--key-name NAME` saves or uses that name instead. Say what it leaves alone.
+   It never saves a long-lived AWS key from the file: Keystub mints
+   short-lived AWS credentials from a key saved in the dashboard, so init
+   links that key or says to add one there; tell the user. Where the account
+   has a short-lived Fly.io or Cloudflare key saved, init links it instead of
+   a stand-in.
 2. On their yes: `keystub init --yes --json`. It adds the services, saves
    each key straight from the file, makes the environment and links the
    keys. The `.env` file isn't changed.
@@ -173,8 +228,11 @@ alone (a key inside a template, a service the catalog doesn't have).
    keystub tokens create my-app/dev --name local-dev --write-env .env --base-urls --yes --json
    ```
 
-   Add `--ttl 2h` for a token that expires, `--service openai` for one
-   service only. Give each sandbox, CI job or worktree its own token.
+   Add `--ttl 2h` for a token that expires, and `--service` for some
+   services only (`--service openai --service anthropic`, or
+   `--service openai,anthropic`); `--write-env` then sets only those
+   services' variables. Give each sandbox, CI job or worktree its own token
+   (see Decide).
 
 8. **Send requests through Keystub** (next section), run the app or its
    tests, and check with `keystub doctor my-app/dev --json` and that the
@@ -200,7 +258,10 @@ A proxy token works only on its way through Keystub. Pick one:
   variables: `KEYSTUB_TOKEN`, `KEYSTUB_DELIVERY_KEY`, `KEYSTUB_EDGE`; put
   them in the sandbox's environment without printing them). There,
   `keystub setup --json` writes `.env`, exports the same variables from
-  `~/.keystub/env.sh` for shells and CLIs, and points gcloud at its token.
+  `~/.keystub/env.sh` for shells and CLIs, points gcloud at its token, and
+  writes the AWS credentials file the aws CLI and SDKs read. For a job that
+  needs only stand-ins, leave out `--delivery` and name the services with
+  `--service`.
 - **The proxy, for every client** (curl, git, any SDK):
   - On a machine running `keystub serve`, or linked to a server with
     `keystub link`, `keystub run -- npm run dev` gives the command this
@@ -243,6 +304,11 @@ A proxy token works only on its way through Keystub. Pick one:
 - **Delete** (ask first): `keystub keys delete team --service openai --yes --json`
   fails with exit code 5 while the key is linked; unlink it first.
   `keystub envs delete my-app/dev --yes --json` revokes its tokens.
+
+- **Keep this skill current:** when `keystub status --json` lists a `skill`
+  copy with `current: false`, or `keystub doctor` warns about it, tell the
+  user and, on their yes, run `keystub skill install`; it takes effect in a
+  new agent session.
 
 The full command guide is [references/cli-guide.md](references/cli-guide.md),
 the same text `keystub help agents` prints.

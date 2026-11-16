@@ -66,6 +66,7 @@ Set Keystub up from the command line (hosted or self-hosted):
   keystub login [--no-browser] | logout | whoami
   keystub init [PROJECT/ENV] [--env-file FILE] [--key-name NAME] [--write-env] [--dry-run]
   keystub setup [PROJECT/ENV] [--env-file FILE] [--ttl 7d] [--cli|--no-cli] [--dry-run] [--print]
+  keystub status [PROJECT/ENV] [--env-file FILE]   what is set up here, and what to do next
   keystub doctor [PROJECT/ENV] [--env-file FILE]
   keystub services list | add | remove
   keystub keys list | add | scan | show | replace | rename | limits | delete
