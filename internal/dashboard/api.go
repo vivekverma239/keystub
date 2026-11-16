@@ -636,7 +636,8 @@ type Token struct {
 	Name      string     `json:"name"`
 	Env       string     `json:"env"`
 	Kind      string     `json:"kind"`
-	Service   *string    `json:"service"`
+	Service   *string    `json:"service"`  // a service token's first service
+	Services  []string   `json:"services"` // a service token's services; null for an environment token
 	Principal *string    `json:"principal"`
 	Limits    Limits     `json:"limits"`
 	ExpiresAt *time.Time `json:"expiresAt"`
@@ -659,6 +660,10 @@ func apiToken(t core.Token, state string) Token {
 	}
 	if t.Service != "" {
 		out.Service = &t.Service
+		out.Services = []string{t.Service}
+		if len(t.Services) > 0 {
+			out.Services = t.Services
+		}
 	}
 	if t.Principal != "" {
 		out.Principal = &t.Principal
@@ -683,7 +688,8 @@ func (s *Server) apiCreateToken(w http.ResponseWriter, r *http.Request, env core
 		Name    string  `json:"name"`
 		TTL     string  `json:"ttl"`
 		Limits  *Limits `json:"limits"`
-		Service *string `json:"service"`
+		Service  *string   `json:"service"`
+		Services *[]string `json:"services"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -700,6 +706,17 @@ func (s *Server) apiCreateToken(w http.ResponseWriter, r *http.Request, env core
 			return
 		}
 		spec.Service = *in.Service
+	}
+	if in.Services != nil {
+		if in.Service != nil {
+			apiError(w, http.StatusBadRequest, "give service or services, not both")
+			return
+		}
+		if len(*in.Services) == 0 {
+			apiError(w, http.StatusBadRequest, "services is empty: leave it out for an environment token")
+			return
+		}
+		spec.Services = *in.Services
 	}
 	secret, t, err := s.Core.CreateToken(r.Context(), spec)
 	if err != nil {

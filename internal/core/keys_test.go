@@ -193,6 +193,39 @@ func TestServiceTokensOnlyWorkForTheirService(t *testing.T) {
 	}
 }
 
+func TestServiceTokenForSeveralServices(t *testing.T) {
+	e, team, _, _ := keysRig(t)
+	gh, _ := e.AddKey(ctx, core.KeySpec{ServiceID: "github", Name: "bot", Value: "ghp-bot"})
+	linkSvc(t, e, dev, "openai", team.ID)
+	linkSvc(t, e, dev, "github", gh.ID)
+	if _, _, err := e.CreateToken(ctx, core.TokenSpec{EnvID: dev, Name: "x", Services: []string{"openai", "anthropic"}}); err == nil {
+		t.Fatal("a token for a service that isn't linked was made")
+	}
+	pair, tok, err := e.CreateToken(ctx, core.TokenSpec{EnvID: dev, Name: "pair", Services: []string{"openai", "github", "openai"}})
+	if err != nil || tok.Kind != core.KindService || tok.Service != "openai" || !slices.Equal(tok.Services, []string{"openai", "github"}) {
+		t.Fatalf("token = %+v, %v", tok, err)
+	}
+	if grantKey(t, e, pair, "openai") != "sk-team" || grantKey(t, e, pair, "github") != "ghp-bot" {
+		t.Fatal("the token doesn't cover its services")
+	}
+	if _, svcs, _ := e.TokenServices(pair); len(svcs) != 2 {
+		t.Fatalf("services = %+v", svcs)
+	}
+	one, tok1, _ := e.CreateToken(ctx, core.TokenSpec{EnvID: dev, Name: "one", Services: []string{"github"}})
+	if tok1.Service != "github" || tok1.Services != nil {
+		t.Fatalf("one-service list = %+v", tok1)
+	}
+	if _, err := e.Authorize(ctx, one, "openai"); !errors.Is(err, core.ErrNotAllowed) {
+		t.Fatalf("other service: %v", err)
+	}
+	if _, _, err := e.CreateToken(ctx, core.TokenSpec{EnvID: dev, Name: "x", Services: []string{}}); err == nil {
+		t.Fatal("an empty list made a token")
+	}
+	if _, _, err := e.CreateToken(ctx, core.TokenSpec{EnvID: dev, Name: "x", Service: "openai", Services: []string{"github"}}); err == nil {
+		t.Fatal("service and services together made a token")
+	}
+}
+
 func TestEnsureTokenNeverHandsOutAServiceToken(t *testing.T) {
 	e, team, _, _ := keysRig(t)
 	res, err := e.LinkKey(ctx, core.LinkSpec{EnvID: dev, ServiceID: "openai", KeyID: team.ID, ServiceToken: true})

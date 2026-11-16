@@ -87,11 +87,11 @@ type tokenFile struct {
 }
 
 // planTokenFile works out the variables for a token of the environment
-// at path: for one service with --service, else for every service the
+// at path: for the services given with --service, else for every service the
 // environment links. withBase adds each one's base URL on the edge.
-func (c *ctx) planTokenFile(path, svc string, withBase bool) (*tokenFile, error) {
-	covered := []string{svc}
-	if svc == "" {
+func (c *ctx) planTokenFile(path string, svcs []string, withBase bool) (*tokenFile, error) {
+	covered := svcs
+	if len(svcs) == 0 {
 		var ls struct {
 			Links []link `json:"links"`
 		}

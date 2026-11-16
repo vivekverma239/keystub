@@ -15,7 +15,7 @@
   {{range .Data.Rows}}
   <tr>
     <td><strong>{{.Name}}</strong>{{if .Principal}} <span class="tag">{{.Principal}}</span>{{end}}</td>
-    <td>{{if .Service}}<span class="tag">{{.Service}}</span>{{else}}<span class="muted">All linked</span>{{end}}</td>
+    <td>{{if .Services}}{{range .Services}}<span class="tag">{{.}}</span> {{end}}{{else if .Service}}<span class="tag">{{.Service}}</span>{{else}}<span class="muted">All linked</span>{{end}}</td>
     <td>{{limits .Limits}}</td>
     <td>{{if .ExpiresAt}}{{when .ExpiresAt}}{{else}}<span class="muted">Never</span>{{end}}</td>
     <td>{{.UsedToday}}</td>

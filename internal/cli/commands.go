@@ -58,6 +58,7 @@ type token struct {
 	Env       string     `json:"env"`
 	Kind      string     `json:"kind"`
 	Service   *string    `json:"service"`
+	Services  []string   `json:"services"` // a service token's services, from a server that has them
 	Limits    *limits    `json:"limits"`
 	ExpiresAt *time.Time `json:"expiresAt"`
 	RevokedAt *time.Time `json:"revokedAt"`
@@ -67,10 +68,21 @@ type token struct {
 }
 
 func (t token) what() string {
-	if t.Service != nil {
-		return "a service token for " + *t.Service + " in " + t.Env
+	if s := t.covers(); s != nil {
+		return "a service token for " + strings.Join(s, ", ") + " in " + t.Env
 	}
 	return "an environment token for every service " + t.Env + " links"
+}
+
+// covers is what a token allows: nil for every service its environment links.
+func (t token) covers() []string {
+	if len(t.Services) > 0 {
+		return t.Services
+	}
+	if t.Service != nil {
+		return []string{*t.Service}
+	}
+	return nil
 }
 
 type project struct {
@@ -744,8 +756,9 @@ func zeroIfNil(l *limits) *limits {
 
 // --- tokens ---
 
-const tokensUsage = `tokens create PROJECT/ENV --name NAME [--ttl 2h] [--service S] [--daily N] [--per-minute N]
+const tokensUsage = `tokens create PROJECT/ENV --name NAME [--ttl 2h] [--service S]… [--daily N] [--per-minute N]
                        [--write-env FILE [--base-urls] | --delivery]
+       (--service more than once, or S1,S2: a token for those services only; none: every service)
        keystub tokens list PROJECT/ENV
        keystub tokens revoke TOKEN_ID --yes`
 
@@ -793,7 +806,7 @@ func (c *ctx) tokens(args []string) error {
 			if err := checkWritable(file); err != nil {
 				return err
 			}
-			if plan, err = c.planTokenFile(path, p.flags["service"], p.has("base-urls")); err != nil {
+			if plan, err = c.planTokenFile(path, p.list("service"), p.has("base-urls")); err != nil {
 				return err
 			}
 			if err := c.confirmWrite(file, *plan); err != nil {
@@ -807,8 +820,15 @@ func (c *ctx) tokens(args []string) error {
 		if v := p.flags["ttl"]; v != "" {
 			body["ttl"] = v
 		}
-		if v, ok := p.flags["service"]; ok {
-			body["service"] = v
+		svcs := p.list("service")
+		if p.has("service") && len(svcs) == 0 {
+			return usageErr("--service needs a service ID, e.g. --service openai")
+		}
+		switch {
+		case len(svcs) == 1:
+			body["service"] = svcs[0]
+		case len(svcs) > 1:
+			body["services"] = svcs
 		}
 		if l != nil {
 			body["limits"] = l
@@ -821,6 +841,12 @@ func (c *ctx) tokens(args []string) error {
 		}
 		if err := c.call("POST", path+"/tokens", body, &out); err != nil {
 			return err
+		}
+		if len(svcs) > 1 && !sameSet(out.Token.covers(), svcs) {
+			// A server without tokens for several services may have made
+			// one for more than was asked: never leave that behind.
+			_ = c.call("POST", "/api/tokens/"+url.PathEscape(out.Token.ID)+"/revoke", nil, nil)
+			return &Error{Code: ExitError, Message: "this server can't make a token for several services (it made a broader one, now revoked): update it, or make one token per service"}
 		}
 		if plan != nil {
 			return c.writeToken(file, *plan, out.Token, backup)
@@ -848,8 +874,8 @@ func (c *ctx) tokens(args []string) error {
 			var rows [][]string
 			for _, t := range out.Tokens {
 				svc := "all linked"
-				if t.Service != nil {
-					svc = *t.Service
+				if s := t.covers(); s != nil {
+					svc = strings.Join(s, ",")
 				}
 				rows = append(rows, []string{t.ID, t.Name, t.Kind, svc, t.Limits.String(), when(t.ExpiresAt), t.State})
 			}
@@ -1069,4 +1095,21 @@ func (c *ctx) ca(args []string) error {
 		return err
 	}
 	return c.emit(map[string]string{"path": out}, func(w io.Writer) { fmt.Fprintf(w, "Wrote the CA certificate to %s.\n", out) })
+}
+
+// sameSet reports whether a and b hold the same strings, in any order.
+func sameSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	in := map[string]bool{}
+	for _, x := range a {
+		in[x] = true
+	}
+	for _, x := range b {
+		if !in[x] {
+			return false
+		}
+	}
+	return true
 }
