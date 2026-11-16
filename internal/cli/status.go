@@ -268,6 +268,7 @@ func (c *ctx) statusEnv(out map[string]any, path, env string, names []string, va
 	// stand-in); the others are keys neither init nor setup takes.
 	setupHelps := false
 	var untaken []string
+	proxyOnly := map[string][]string{} // service -> its variables, for services with no base URL
 	if sf.Exists {
 		if reads, err := c.readers(); err == nil {
 			sf.RealKeys = []string{}
@@ -284,10 +285,15 @@ func (c *ctx) statusEnv(out map[string]any, path, env string, names []string, va
 					continue
 				}
 				sf.RealKeys = append(sf.RealKeys, n)
-				if linked[id] && !r.secret && !r.minted && !r.templated {
-					setupHelps = true
-				} else {
+				switch {
+				case !linked[id] || r.secret || r.minted || r.templated:
 					untaken = append(untaken, n)
+				case r.service.BaseURL != nil && r.service.BaseURL.Var != "":
+					setupHelps = true // setup writes the stand-in and the base URL
+				default:
+					// No base URL: setup skips it; a token in the file
+					// works through the proxy (keystub run).
+					proxyOnly[id] = append(proxyOnly[id], n)
 				}
 			}
 		}
@@ -322,6 +328,20 @@ func (c *ctx) statusEnv(out map[string]any, path, env string, names []string, va
 		next = append(next, suggest("setup", "--dry-run", "--json")+", then ask the user before writing tokens in place of the real keys")
 	case len(sf.Tokens) > 0:
 		next = append(next, suggest("doctor", "--json")+" (checks each token works)")
+	}
+	if !initChanges && len(proxyOnly) > 0 {
+		var ids, vars []string
+		for id, vs := range proxyOnly {
+			ids = append(ids, id)
+			vars = append(vars, vs...)
+		}
+		sort.Strings(ids)
+		sort.Strings(vars)
+		more := []string{}
+		for _, id := range ids {
+			more = append(more, "--service", id)
+		}
+		next = append(next, fmt.Sprintf("%s still hold real keys for services with no base URL, which setup leaves alone: ask the user, then keystub tokens create %s --name NAME %s --write-env %s --yes --json, and run the app with keystub run -- COMMAND", strings.Join(vars, ", "), shellQuote(env), strings.Join(more, " "), shellQuote(sf.Path)))
 	}
 	if !initChanges && len(untaken) > 0 {
 		next = append(next, fmt.Sprintf("%s still hold real keys that init and setup leave alone (%s shows why under skipped): tell the user", strings.Join(untaken, ", "), suggest("init", "--dry-run", "--json")))
