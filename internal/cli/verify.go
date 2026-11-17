@@ -63,7 +63,6 @@ const helloImage = "us-docker.pkg.dev/cloudrun/container/hello"
 type verifyResult struct {
 	Env    string   `json:"env,omitempty"`
 	File   string   `json:"file"`
-	OK     bool     `json:"ok"`
 	Checks []check  `json:"checks"`
 	Fixes  []string `json:"fixes,omitempty"` // commands that fix a failed or warned check
 }
