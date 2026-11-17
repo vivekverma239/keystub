@@ -56,6 +56,13 @@ The short way, for a project with a .env file:
    When the code deploys somewhere (fly.toml, a wrangler config, convex/),
    init ends by asking to connect it. On its own, at a terminal:
    keystub connect                    (Fly.io and Convex from their CLIs' logins, Cloudflare from an account token it opens the page for)
+   Then check it end to end, where the code will run:
+   keystub verify --json              (each credential here, read-only: the Google Cloud permissions the deploys need, with the grant command for what's missing; and the CLIs they need)
+   keystub verify --deploy --json     (also deploys a throwaway Cloud Run service and Worker, and deletes them)
+   keystub tools install --json       (installs the CLIs the deploys need: gcloud, fly, wrangler, aws)
+   keystub sandbox start --port 3000 --json   (a Docker sandbox with this code, no .env files and a 2-hour token, set up inside)
+   keystub sandbox exec NAME -- npm test     (runs a command in it, through Keystub's proxy)
+   keystub sandbox stop NAME --json   (revokes its token and removes it)
 The steps below do the same one at a time.
 
 1. Sign in.

@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -37,7 +38,7 @@ const (
 )
 
 // Commands are the top-level commands this package runs.
-var Commands = []string{"login", "logout", "whoami", "init", "doctor", "status", "keys", "projects", "envs", "tokens", "services", "usage", "setup", "connect", "ca"}
+var Commands = []string{"login", "logout", "whoami", "init", "doctor", "status", "keys", "projects", "envs", "tokens", "services", "usage", "setup", "connect", "verify", "sandbox", "tools", "ca"}
 
 // Env is everything a command touches outside itself, so tests can run
 // it in-process.
@@ -55,6 +56,9 @@ type Env struct {
 	// OpenURL opens a page in the person's browser; nil, or an error, when
 	// there's none to open (a test, or a shell over SSH).
 	OpenURL func(url string) error
+	// Exec runs a program (docker, a tool's installer) with the given
+	// streams; env nil keeps this process's. Nil runs it for real.
+	Exec func(stdin io.Reader, stdout, stderr io.Writer, env []string, name string, args ...string) error
 }
 
 // Error is a failure with its exit code.
@@ -80,6 +84,9 @@ func Main(e Env, cmd string, args []string) int {
 	}
 	if e.Getenv == nil {
 		e.Getenv = os.Getenv
+	}
+	if e.Exec == nil {
+		e.Exec = runProgram
 	}
 	g, rest, err := globals(args)
 	c := &ctx{Env: e, json: g.json, yes: g.yes}
@@ -144,6 +151,12 @@ func (c *ctx) dispatch(cmd string, args []string) error {
 		return c.usage(args)
 	case "setup":
 		return c.setup(args)
+	case "verify":
+		return c.verify(args)
+	case "sandbox":
+		return c.sandbox(args)
+	case "tools":
+		return c.tools(args)
 	case "connect":
 		return c.connect(args)
 	case "ca":
@@ -674,4 +687,11 @@ func envPath(env string) (string, error) {
 		return "", usageErr("%q isn't an environment like my-app/dev", env)
 	}
 	return "/api/environments/" + url.PathEscape(p) + "/" + url.PathEscape(e), nil
+}
+
+// runProgram runs a program for real.
+func runProgram(stdin io.Reader, stdout, stderr io.Writer, env []string, name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr, cmd.Env = stdin, stdout, stderr, env
+	return cmd.Run()
 }

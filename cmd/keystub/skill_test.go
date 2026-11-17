@@ -309,6 +309,10 @@ func checkAPICommand(t *testing.T, cmd string, args []string) error {
 		Home:   t.TempDir(),
 		Client: &http.Client{Transport: unreachable{}},
 		Sleep:  func(d time.Duration) {},
+		// Nothing runs: no docker, no installers.
+		Exec: func(io.Reader, io.Writer, io.Writer, []string, string, ...string) error {
+			return errors.New("no programs run in this test")
+		},
 	}, cmd, args)
 	msg := strings.TrimSpace(out.String() + errOut.String())
 	if mention {

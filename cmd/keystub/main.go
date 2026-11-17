@@ -70,6 +70,11 @@ Set Keystub up from the command line (hosted or self-hosted):
   keystub doctor [PROJECT/ENV] [--env-file FILE]
   keystub connect [PROJECT/ENV] [--dir DIR] [--only fly,convex,cloudflare] [--dry-run]
                                   let sessions deploy where this code deploys to
+  keystub verify [PROJECT/ENV] [--env-file FILE] [--deploy] [--region REGION]
+                                  check each credential here works for what the code does
+  keystub sandbox start [PROJECT/ENV] [--port PORT]... [--copy-env NAMES] | exec NAME -- CMD | list | stop NAME
+                                  run this code in a Docker sandbox with only Keystub's credentials
+  keystub tools check | install [gcloud|fly|wrangler|aws]
   keystub services list | add | remove
   keystub keys list | add | scan | show | replace | rename | limits | delete
   keystub projects list | limits

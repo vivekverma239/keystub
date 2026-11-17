@@ -627,27 +627,7 @@ func (c *ctx) doctor(args []string) error {
 	add := func(name, status, format string, a ...any) {
 		checks = append(checks, check{name, status, fmt.Sprintf(format, a...)})
 	}
-	// report prints the checks: with --json one value on stdout, the
-	// result, or on a failure the error with the checks in it.
-	report := func() error {
-		failed := false
-		for _, ch := range checks {
-			failed = failed || ch.Status == "fail"
-		}
-		if failed && c.json {
-			return &Error{Code: ExitError, Message: "some checks failed", Extra: map[string]any{"env": env, "file": file, "ok": false, "checks": checks}}
-		}
-		err := c.emit(map[string]any{"env": env, "file": file, "ok": !failed, "checks": checks}, func(w io.Writer) {
-			for _, ch := range checks {
-				mark := map[string]string{"ok": "ok  ", "warn": "warn", "fail": "FAIL"}[ch.Status]
-				fmt.Fprintf(w, "%s  %-22s %s\n", mark, ch.Name, ch.Detail)
-			}
-		})
-		if err == nil && failed {
-			return &Error{Code: ExitError, Message: "some checks failed"}
-		}
-		return err
-	}
+	report := func() error { return c.reportChecks(env, file, checks, nil) }
 
 	// An installed skill older than this CLI teaches the agent stale commands.
 	home := c.Getenv("HOME")
@@ -747,6 +727,39 @@ func (c *ctx) doctor(args []string) error {
 		}
 	}
 	return report()
+}
+
+// reportChecks prints checks (and the commands that fix them): with --json
+// one value on stdout, the result, or on a failure the error with the
+// checks in it.
+func (c *ctx) reportChecks(env, file string, checks []check, fixes []string) error {
+	failed := false
+	for _, ch := range checks {
+		failed = failed || ch.Status == "fail"
+	}
+	out := map[string]any{"env": env, "file": file, "ok": !failed, "checks": checks}
+	if len(fixes) > 0 {
+		out["fixes"] = fixes
+	}
+	if failed && c.json {
+		return &Error{Code: ExitError, Message: "some checks failed", Extra: out}
+	}
+	err := c.emit(out, func(w io.Writer) {
+		for _, ch := range checks {
+			mark := map[string]string{"ok": "ok  ", "warn": "warn", "fail": "FAIL"}[ch.Status]
+			fmt.Fprintf(w, "%s  %-22s %s\n", mark, ch.Name, ch.Detail)
+		}
+		if len(fixes) > 0 {
+			fmt.Fprintln(w, "\nTo fix:")
+			for _, f := range fixes {
+				fmt.Fprintln(w, "  "+f)
+			}
+		}
+	})
+	if err == nil && failed {
+		return &Error{Code: ExitError, Message: "some checks failed"}
+	}
+	return err
 }
 
 var tokenPattern = regexp.MustCompile(`(sk-stub-|skstub)[A-Za-z0-9_-]+`)
