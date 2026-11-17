@@ -32,9 +32,15 @@ keystub init --dry-run     # what it would save: keys and secrets; then keystub 
 keystub setup              # .env gets stand-ins in place of the real keys, and the secrets (asks; keeps a copy in ~/.keystub/backups)
 keystub doctor             # checks the setup and the token
 keystub connect            # lets sessions deploy where the code deploys to (asks for each)
+keystub verify             # checks each credential works for what the code does (--deploy rehearses a deploy)
+keystub sandbox start --port 3000   # runs the code in Docker with only Keystub's credentials
 ```
 
 `keystub connect` finds `fly.toml`, a wrangler config and a `convex/` folder and, for each one you say yes to, saves a key Keystub mints a short-lived deploy sign-in from for every session: Fly.io from the `fly` CLI's login (`fly tokens create deploy`), Convex from the Convex CLI's login, Cloudflare from an account token it opens the page for and checks. `init` asks the same at its end.
+
+`keystub verify` makes one read-only call with each credential a program here gets. For Google Cloud it checks the permissions the code's deploys need (Cloud Run, Cloud Build, App Engine, Firebase), and prints the `gcloud … add-iam-policy-binding` command for what's missing. It also says which CLIs the deploys need: `keystub tools install` installs gcloud, fly, wrangler or aws under `~/.local`. `--deploy` deploys Google's sample image as a throwaway Cloud Run service, and a one-line Worker, then deletes both.
+
+`keystub sandbox start` tests the app end to end the way an agent's box runs it. It starts a Docker container with a copy of the code, leaving out `.git`, dependencies and every `.env` file but an example, and makes a 2-hour token for it. It runs `keystub setup` inside and installs the CLIs. It reports what your `.env` sets that Keystub doesn't give (`--copy-env NAME` copies config in). `keystub sandbox exec NAME -- npm test` runs a command through Keystub's proxy, and `--port` publishes the app's ports to this machine. `keystub sandbox stop NAME` revokes the token and removes the container.
 
 In a sandbox or CI job, make an access on your machine with `keystub tokens create my-app/dev --name ci --ttl 1d --delivery`, put its three variables (`KEYSTUB_TOKEN`, `KEYSTUB_DELIVERY_KEY`, `KEYSTUB_EDGE`) in the sandbox's environment, and run `keystub setup` there: it writes `.env`, exports the same variables from `~/.keystub/env.sh` for shells and CLIs, and points gcloud at its short-lived token.
 

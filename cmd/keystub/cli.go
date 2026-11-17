@@ -25,6 +25,7 @@ func cliMain(cmd string, args []string) {
 		os.Exit(cli.ExitError)
 	}
 	host, _ := os.Hostname()
+	cli.Version = version
 	os.Exit(cli.Main(cli.Env{
 		Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr,
 		Getenv: legacy.Getenv, Home: dir, Hostname: host,

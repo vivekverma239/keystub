@@ -169,6 +169,12 @@ in this folder and uses the environment `<folder>/dev`; name others with
    and Convex come from their CLI logins; `--only fly,convex` with `--yes`
    connects those two without a terminal. Never pass `--yes` unasked: it
    makes deploy tokens.
+6. Check what was delivered works for what the code does:
+   `keystub verify --json`. It makes one read-only call with each
+   credential, checks the Google Cloud permissions the code's deploys need,
+   and lists the CLIs they need. Show the user `fixes` (a grant command, a
+   CLI to install) and run one only on their yes. Then test the app end to
+   end in a sandbox (next section).
 
 The steps below do the same one at a time, for anything `init` leaves
 alone (a key inside a template, a service the catalog doesn't have).
@@ -252,6 +258,49 @@ alone (a key inside a template, a service the catalog doesn't have).
 
 9. Make sure the `.env` file is in `.gitignore`. A proxy token is still a
    credential.
+
+## Test end to end in a sandbox
+
+Prove the app works with Keystub alone, the way an agent's box runs it:
+no `.env` with real keys, only stand-ins and short-lived credentials. Needs
+Docker. Tell the user what you're doing first; each step's output names
+the next.
+
+1. **Start one**: `keystub sandbox start --port 3000 --json`, with the port
+   the app listens on (repeat `--port` for more). It copies this folder in
+   without `.git`, dependency folders or any `.env` file but an example,
+   makes a 2-hour token for the environment (never printed), runs
+   `keystub setup` inside, and installs the CLIs the deploys need. `ports`
+   maps each port to an address on this machine.
+2. **Fill the gaps it reports** in `notInSandbox`: what the local `.env`
+   sets that Keystub doesn't give. Ask the user, never copy on your own:
+   - `secrets`: they add them to the environment in Keystub (the dashboard,
+     or `keystub init`), then you start again;
+   - `config` (URLs, flags, ports): copied in with
+     `keystub sandbox stop NAME --json` and
+     `keystub sandbox start --port 3000 --copy-env NAME,NAME --json`. The CLI
+     copies the values; you don't see them.
+3. **Install and run it**: `keystub sandbox exec NAME -- npm ci` (the
+   project's own install), then start the app in the background listening
+   on 0.0.0.0 (`PORT`, `HOST`), with its log in a file:
+   `keystub sandbox exec NAME -- sh -c 'HOST=0.0.0.0 PORT=3000 nohup npm run dev > /tmp/app.log 2>&1 &'`.
+   `exec` runs every command through Keystub's proxy (`keystub run`), so
+   services with no base URL work too; `--direct` skips it.
+4. **Test it the way it's used**: find what the app offers (its README,
+   routes, an OpenAPI file, its pages) and call it from this machine at the
+   `ports` address: its health check, then the real flows, through its API
+   (curl) or its UI (a browser). Run the project's own tests in the sandbox
+   too (`keystub sandbox exec NAME -- npm test`). When a flow fails, read
+   `/tmp/app.log` in the sandbox; a missing variable means step 2.
+5. **Check deploys**, when the user wants that: inside, run
+   `keystub sandbox exec NAME -- keystub verify --json`, and only on their
+   yes `keystub sandbox exec NAME -- keystub verify --deploy --json`, which
+   deploys a throwaway Cloud Run service and Worker and deletes them; never
+   the app itself unless they ask.
+6. **Confirm it went through Keystub**:
+   `keystub usage --range 24h --json` shows the calls.
+7. **Stop it**: `keystub sandbox stop NAME --json` revokes the token and
+   removes the container. Report what worked, what failed and the fixes.
 
 ## Send requests through Keystub
 
