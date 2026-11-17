@@ -90,33 +90,10 @@ func (c *ctx) verify(args []string) error {
 	} else if e := readProjectFile(filepath.Dir(file)); e != "" {
 		res.Env = e
 	}
-	v := &verifier{c: c, res: &res, vars: c.verifyVars(file), dir: dir, deploy: p.has("deploy"), region: p.flags["region"]}
+	v := &verifier{c: c, res: &res, vars: c.verifyVars(file), managed: c.managedVars(file), dir: dir, deploy: p.has("deploy"), region: p.flags["region"]}
 	v.run()
 
-	failed := false
-	for _, ch := range res.Checks {
-		failed = failed || ch.Status == "fail"
-	}
-	res.OK = !failed
-	if failed && c.json {
-		return &Error{Code: ExitError, Message: "some checks failed", Extra: map[string]any{"env": res.Env, "file": file, "ok": false, "checks": res.Checks, "fixes": res.Fixes}}
-	}
-	err = c.emit(res, func(w io.Writer) {
-		for _, ch := range res.Checks {
-			mark := map[string]string{"ok": "ok  ", "warn": "warn", "fail": "FAIL"}[ch.Status]
-			fmt.Fprintf(w, "%s  %-22s %s\n", mark, ch.Name, ch.Detail)
-		}
-		if len(res.Fixes) > 0 {
-			fmt.Fprintln(w, "\nTo fix:")
-			for _, f := range res.Fixes {
-				fmt.Fprintln(w, "  "+f)
-			}
-		}
-	})
-	if err == nil && failed {
-		return &Error{Code: ExitError, Message: "some checks failed"}
-	}
-	return err
+	return c.reportChecks(res.Env, file, res.Checks, res.Fixes)
 }
 
 // verifyVars is what a program here would read: the env file first, then
@@ -169,12 +146,13 @@ func unSingle(v string) string {
 }
 
 type verifier struct {
-	c      *ctx
-	res    *verifyResult
-	vars   map[string]string
-	dir    string
-	deploy bool
-	region string
+	c       *ctx
+	res     *verifyResult
+	vars    map[string]string
+	managed map[string]bool // variables keystub setup wrote to the file
+	dir     string
+	deploy  bool
+	region  string
 }
 
 func (v *verifier) add(name, status, format string, a ...any) {
@@ -228,8 +206,13 @@ func (v *verifier) envArg() string {
 var edgeService = regexp.MustCompile(`^(https?://[^/]+)/s/([a-z0-9][a-z0-9-]*)`)
 
 // standIns probes each service setup pointed at the edge, with the token
-// in the variables.
+// in the variables. Only Keystub's edge gets the token: a URL setup wrote,
+// or one on KEYSTUB_EDGE's host, never any URL that merely has /s/ in it.
 func (v *verifier) standIns() bool {
+	edgeHost := ""
+	if u, err := url.Parse(v.vars["KEYSTUB_EDGE"]); err == nil {
+		edgeHost = u.Host
+	}
 	tok := ""
 	names := make([]string, 0, len(v.vars))
 	for n := range v.vars {
@@ -247,6 +230,9 @@ func (v *verifier) standIns() bool {
 	for _, n := range names {
 		m := edgeService.FindStringSubmatch(v.vars[n])
 		if m == nil || seen[m[2]] {
+			continue
+		}
+		if u, err := url.Parse(m[1]); err != nil || (!v.managed[n] && (edgeHost == "" || u.Host != edgeHost)) {
 			continue
 		}
 		seen[m[2]] = true

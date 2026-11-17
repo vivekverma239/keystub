@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -167,10 +168,33 @@ func (c *ctx) sandboxStart(args []string) error {
 	for _, v := range p.all["port"] {
 		for _, x := range strings.Split(v, ",") {
 			if x = strings.TrimSpace(x); x != "" {
-				if !regexp.MustCompile(`^\d{1,5}$`).MatchString(x) {
+				if n, err := strconv.Atoi(x); err != nil || n < 1 || n > 65535 {
 					return usageErr("--port takes a port number, like 3000")
 				}
 				ports = append(ports, x)
+			}
+		}
+	}
+	copyNames := map[string]bool{}
+	for _, v := range p.all["copy-env"] {
+		for _, n := range strings.Split(v, ",") {
+			if n = strings.TrimSpace(n); n != "" {
+				copyNames[n] = true
+			}
+		}
+	}
+	localFile := p.flags["env-file"]
+	if localFile == "" {
+		localFile = filepath.Join(dir, ".env")
+	}
+	localNames, localValues, localErr := dotenvNames(localFile)
+	if len(copyNames) > 0 {
+		if localErr != nil {
+			return &Error{Code: ExitNotFound, Message: fmt.Sprintf("--copy-env reads %s, which can't be read: %v", localFile, localErr)}
+		}
+		for n := range copyNames {
+			if _, ok := localValues[n]; !ok {
+				return &Error{Code: ExitNotFound, Message: fmt.Sprintf("--copy-env %s: %s doesn't set it", n, localFile)}
 			}
 		}
 	}
@@ -211,6 +235,7 @@ func (c *ctx) sandboxStart(args []string) error {
 	fail := func(step string, err error) error {
 		_, _ = c.docker("rm", "-f", st.Container)
 		revoke()
+		_ = os.Remove(c.sandboxPath(name))
 		return &Error{Code: ExitError, Message: step + ": " + err.Error() + " (the sandbox was removed and its token revoked)"}
 	}
 	if err := c.copyCode(dir, st.Container); err != nil {
@@ -218,6 +243,10 @@ func (c *ctx) sandboxStart(args []string) error {
 	}
 	if err := c.installKeystub(st.Container, binary); err != nil {
 		return fail("couldn't install keystub in the sandbox", err)
+	}
+	var warnings []string
+	if binary == "" && (Version == "dev" || Version == "") {
+		warnings = append(warnings, "this is a dev build, so the sandbox has keystub's latest release, which may lack commands this one has: pass --keystub with a Linux build of this one")
 	}
 	if err := c.saveSandbox(st); err != nil {
 		return fail("couldn't keep the sandbox's state", err)
@@ -229,18 +258,15 @@ func (c *ctx) sandboxStart(args []string) error {
 	if err != nil {
 		res["setupError"] = lastLine(out)
 	} else {
-		_ = json.Unmarshal([]byte(out), &setup)
+		_ = json.Unmarshal([]byte(lastJSON(out)), &setup)
 		res["setup"] = map[string]any{"set": setup["set"], "failed": setup["failed"], "skipped": setup["skipped"], "clis": setup["clis"]}
 		st.SetupAt = time.Now()
 	}
 	// What the folder's env file sets that Keystub doesn't give the
 	// sandbox: config to copy in (--copy-env, asked first), or a secret
 	// to add to Keystub.
-	localFile := p.flags["env-file"]
-	if localFile == "" {
-		localFile = filepath.Join(dir, ".env")
-	}
-	if names, values, err := dotenvNames(localFile); err == nil {
+	if localErr == nil {
+		names, values := localNames, localValues
 		given := map[string]bool{}
 		for _, key := range []string{"set", "skipped"} {
 			list, _ := setup[key].([]any)
@@ -253,31 +279,19 @@ func (c *ctx) sandboxStart(args []string) error {
 				}
 			}
 		}
-		copyNames := map[string]bool{}
-		for _, v := range p.all["copy-env"] {
-			for _, n := range strings.Split(v, ",") {
-				if n = strings.TrimSpace(n); n != "" {
-					copyNames[n] = true
-				}
-			}
-		}
 		var copied, missing []string
 		var lines strings.Builder
 		for _, n := range names {
 			switch {
+			case given[n]:
+				if copyNames[n] {
+					return fail("--copy-env "+n, errors.New("Keystub gives the sandbox this one; copying it would put the real value in"))
+				}
 			case copyNames[n]:
 				copied = append(copied, n)
 				lines.WriteString(n + "=" + dotenvQuote(values[n]) + "\n")
-			case !given[n]:
+			default:
 				missing = append(missing, n)
-			}
-		}
-		for n := range copyNames {
-			if _, ok := values[n]; !ok {
-				_, _ = c.docker("rm", "-f", st.Container)
-				revoke()
-				_ = os.Remove(c.sandboxPath(name))
-				return usageErr("--copy-env %s: %s doesn't set it", n, localFile)
 			}
 		}
 		var secretish, config []string
@@ -310,7 +324,7 @@ func (c *ctx) sandboxStart(args []string) error {
 		// the token file.
 		if ts, ok := res["tools"].([]any); ok {
 			for _, t := range ts {
-				if m, _ := t.(map[string]any); m["name"] == "gcloud" && m["done"] != nil {
+				if m, _ := t.(map[string]any); m["name"] == "gcloud" && strings.HasPrefix(fmt.Sprint(m["done"]), "installed") {
 					_, _ = c.inSandbox(st.Container, "keystub setup --json")
 				}
 			}
@@ -326,6 +340,9 @@ func (c *ctx) sandboxStart(args []string) error {
 		res["ports"] = st.Ports
 	}
 	_ = c.saveSandbox(st)
+	if len(warnings) > 0 {
+		res["warnings"] = warnings
+	}
 	next := []string{}
 	if m, ok := res["notInSandbox"].(map[string][]string); ok {
 		if len(m["secrets"]) > 0 {

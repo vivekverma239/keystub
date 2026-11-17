@@ -194,7 +194,15 @@ func runCLI(t *testing.T, home string, programs *[]ranProgram, cmd string, args 
 	return result{code, out.String(), errb.String()}
 }
 
+// leak is a server that fails the test if anything reaches it.
+var leak string
+
 func verifyProject(t *testing.T) (dir, home string) {
+	ls := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("a token went to a host that isn't Keystub's: %s %s", r.URL, r.Header.Get("Authorization"))
+	}))
+	t.Cleanup(ls.Close)
+	leak = ls.URL
 	dir, home = t.TempDir(), t.TempDir()
 	tokFile := filepath.Join(home, ".keystub", "files", "acme-dev", "google-cloud", "access-token")
 	writeFile(t, tokFile, fakeGoogleToken+"\n")
@@ -205,6 +213,9 @@ func verifyProject(t *testing.T) (dir, home string) {
 		"CLOUDFLARE_API_TOKEN=" + fakeCFToken,
 		"CLOUDFLARE_ACCOUNT_ID=" + fakeAccount,
 		"CONVEX_DEPLOY_KEY='" + fakeConvexKey + "'",
+		// Not Keystub's: never sent a token.
+		"ASSETS_URL=" + leak + "/s/images",
+		"OPENAI_API_KEY=sk-stub-fake0000",
 	}, "\n")+"\n")
 	// What setup exports for the shell: Google Cloud's sign-in.
 	writeFile(t, filepath.Join(home, ".keystub", "env.sh"), "# Written by keystub setup.\nexport CLOUDSDK_AUTH_ACCESS_TOKEN_FILE="+shSingle(tokFile)+"\nexport CLOUDSDK_CORE_PROJECT='acme-prod'\n")

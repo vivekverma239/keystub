@@ -76,7 +76,7 @@ func (d *fakeDocker) exec(stdin io.Reader, stdout, stderr io.Writer, _ []string,
 				_, _ = io.WriteString(stdout, "keystub: the edge refused KEYSTUB_TOKEN\n")
 				return errors.New("exit 1")
 			}
-			_, _ = io.WriteString(stdout, `{"set":[{"name":"OPENAI_API_KEY","service":"openai","protection":"never-on-box"},{"name":"OPENAI_BASE_URL","service":"openai","protection":"never-on-box"}],"skipped":[{"var":"EXA_API_KEY","reason":"no base URL"}],"failed":[]}`+"\n")
+			_, _ = io.WriteString(stdout, "a notice on stderr\n"+`{"set":[{"name":"OPENAI_API_KEY","service":"openai","protection":"never-on-box"},{"name":"OPENAI_BASE_URL","service":"openai","protection":"never-on-box"}],"skipped":[{"var":"EXA_API_KEY","reason":"no base URL"}],"failed":[]}`+"\n")
 		case strings.Contains(line, "keystub tools install --json"):
 			_, _ = io.WriteString(stdout, "Downloading…\n{\n  \"tools\": [\n    {\n      \"name\": \"fly\",\n      \"installed\": true\n    }\n  ]\n}\n")
 		case strings.Contains(line, `exec keystub run --remote "$KEYSTUB_EDGE" -- "$@"`), strings.Contains(line, `exec "$@"`):
@@ -228,8 +228,8 @@ func TestSandboxFailures(t *testing.T) {
 	// --copy-env of a name the file doesn't set: nothing is left running.
 	d := &fakeDocker{running: map[string]bool{}, files: map[string]string{}}
 	r := f.run(t, home, d, "sandbox", "start", "acme/dev", "--dir", dir, "--name", "t2", "--copy-env", "NOPE", "--keystub", "/k", "--json")
-	if r.code != ExitUsage || len(d.running) != 0 || len(f.revoked) != 1 {
-		t.Errorf("bad --copy-env: %d running %v revoked %v (%s)", r.code, d.running, f.revoked, r.stdout)
+	if r.code != ExitNotFound || len(d.running) != 0 || len(f.made) != 0 {
+		t.Errorf("bad --copy-env: %d running %v made %v (%s)", r.code, d.running, f.made, r.stdout)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".keystub", "sandboxes", "t2.json")); err == nil {
 		t.Error("state left for a sandbox that's gone")
@@ -245,6 +245,23 @@ func TestSandboxFailures(t *testing.T) {
 	}, Home: filepath.Join(home, ".keystub"), Exec: noDocker}, "sandbox", []string{"start", "acme/dev", "--dir", dir, "--json"})
 	if code != ExitError || len(f.made) != before || !strings.Contains(out.String(), "Docker isn't running") {
 		t.Errorf("no docker: %d %s", code, out.String())
+	}
+	// A variable Keystub gives can't be copied in: that's the real key.
+	d = &fakeDocker{running: map[string]bool{}, files: map[string]string{}}
+	writeFile(t, filepath.Join(dir, ".env"), "API_URL=x\nOPENAI_API_KEY=sk-real\n")
+	r = f.run(t, home, d, "sandbox", "start", "acme/dev", "--dir", dir, "--name", "t3", "--copy-env", "OPENAI_API_KEY", "--keystub", "/k", "--json")
+	if r.code != ExitError || d.appended != "" || len(d.running) != 0 || !strings.Contains(r.stdout, "Keystub gives") {
+		t.Errorf("copying a given key: %d appended %q (%s)", r.code, d.appended, r.stdout)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".keystub", "sandboxes", "t3.json")); err == nil {
+		t.Error("state left after a failed start")
+	}
+	// --copy-env with no env file to read.
+	if r := f.run(t, home, d, "sandbox", "start", "acme/dev", "--dir", t.TempDir(), "--copy-env", "API_URL", "--json"); r.code != ExitNotFound {
+		t.Errorf("no env file: %d", r.code)
+	}
+	if r := f.run(t, home, d, "sandbox", "start", "acme/dev", "--port", "99999", "--json"); r.code != ExitUsage {
+		t.Errorf("port 99999: %d", r.code)
 	}
 	if r := f.run(t, home, d, "sandbox", "start", "acme/dev", "--name", "Bad_Name", "--json"); r.code != ExitUsage {
 		t.Errorf("bad name: %d", r.code)
