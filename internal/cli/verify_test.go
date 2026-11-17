@@ -74,7 +74,7 @@ func newFakeClouds(t *testing.T) *fakeClouds {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"permissions": has})
 	})
-	mux.HandleFunc("/run/projects/acme-prod/locations/{region}/services/{rest...}", func(w http.ResponseWriter, r *http.Request) {
+	runServices := func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.calls = append(f.calls, r.Method+" run "+r.PathValue("region")+" "+r.PathValue("rest")+r.URL.RawQuery)
@@ -85,6 +85,10 @@ func newFakeClouds(t *testing.T) *fakeClouds {
 		name := r.PathValue("rest")
 		switch r.Method {
 		case "POST":
+			if name != "" {
+				w.WriteHeader(404)
+				return
+			}
 			id := r.URL.Query().Get("serviceId")
 			f.services[id] = 0
 			_, _ = io.WriteString(w, `{"name":"operations/1"}`)
@@ -99,7 +103,9 @@ func newFakeClouds(t *testing.T) *fakeClouds {
 			delete(f.services, name)
 			_, _ = io.WriteString(w, `{"name":"operations/2"}`)
 		}
-	})
+	}
+	mux.HandleFunc("POST /run/projects/acme-prod/locations/{region}/services", runServices)
+	mux.HandleFunc("/run/projects/acme-prod/locations/{region}/services/{rest...}", runServices)
 	mux.HandleFunc("GET /fly/apps/{app}", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != fakeFlyToken {
 			w.WriteHeader(401)
